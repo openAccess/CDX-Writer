@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-""" Copyright(c)2012-2013 Internet Archive. Software license AGPL version 3.
+""" Copyright(c)2012-2016 Internet Archive. Software license AGPL version 3.
 
 This script requires a modified version of Hanzo Archives' warc-tools:
 http://code.hanzoarchives.com/warc-tools/src/tip/hanzo/warctools
@@ -10,8 +10,11 @@ http://code.hanzoarchives.com/warc-tools/src/1897e2bc9d29/warcindex.py
 
 The functions that start with "get_" (as opposed to "parse_") are called by the
 dispatch loop in make_cdx using getattr().
+
+Jan 2016: Modified to include language
+May 2016: Modified to include simhash
 """
-from hanzo.warctools import ArchiveRecord #from https://bitbucket.org/rajbot/warc-tools
+from warctools import ArchiveRecord #from https://bitbucket.org/rajbot/warc-tools
 from surt      import surt          #from https://github.com/rajbot/surt
 from surt      import DefaultIAURLCanonicalizer
 
@@ -24,9 +27,10 @@ import hashlib
 import json
 import urllib
 import urlparse
+import string
+from itertools import groupby
 from datetime  import datetime
 from optparse  import OptionParser
-
 
 class ParseError(Exception):
     pass
@@ -34,7 +38,7 @@ class ParseError(Exception):
 class CDX_Writer(object):
     # init()
     #___________________________________________________________________________
-    def __init__(self, file, out_file=sys.stdout, format="N b a m s k r M S V g", use_full_path=False, file_prefix=None, all_records=False, screenshot_mode=False, exclude_list=None, stats_file=None, canonicalizer_options=None):
+    def __init__(self, file, out_file=sys.stdout, format="N b a m s k r M S V g", use_full_path=False, file_prefix=None, all_records=False, screenshot_mode=False, exclude_list=None, stats_file=None, canonicalizer_options=None, content_features=False):
 
         self.field_map = {'M': 'AIF meta tags',
                           'N': 'massaged url',
@@ -47,10 +51,15 @@ class CDX_Writer(object):
                           'm': 'mime type',
                           'r': 'redirect',
                           's': 'response code',
+                          'Q': 'language string',
+                          'C': 'simhash'
                          }
 
         self.file   = file
         self.out_file = out_file
+        self.content_features = content_features
+        if self.content_features:
+            format = format + " Q C"
         self.format = format
         self.all_records  = all_records
         self.screenshot_mode = screenshot_mode
@@ -71,6 +80,11 @@ class CDX_Writer(object):
         self.content       = None
         self.meta_tags     = None
         self.response_code = None
+
+        #content based features
+        self.extracted_text  = None
+        self.language_string = None
+        self.simhash         = None
 
         #Large html files cause lxml to segfault
         #problematic file was 154MB, we'll stop at 5MB
@@ -380,6 +394,85 @@ class CDX_Writer(object):
         date = datetime.strptime(record.date, "%Y-%m-%dT%H:%M:%SZ")
         return date.strftime("%Y%m%d%H%M%S")
 
+    # extract_text()
+    #___________________________________________________________________________
+    def extract_text(self, record):
+
+        import lxml.html
+        from lxml.html.clean import Cleaner
+
+        result = None
+        if not ('response' == record.type and self.response_code == '200'):
+            return None
+        if self.mime_type != 'text/html':
+            return None
+        if self.content is None or record.content_length > self.lxml_parse_limit:
+            return None
+        html_string = self.content
+        cleaner = Cleaner()
+        cleaner.javascript = True
+        cleaner.style = True
+        try:
+            root = lxml.html.fromstring(html_string)
+            root = cleaner.clean_html(root)
+            text_content = root.text_content().encode('utf-8')
+            result = text_content
+        except:
+            pass
+        return result
+
+    # get_language_string() //field "Q"
+    #___________________________________________________________________________
+    def get_language_string(self, record):
+
+        import cld2full as cld2
+
+        result = '-'
+        text_string = self.extracted_text
+        if text_string is None:
+            return result
+        isReliable = None
+        details = None
+        try:
+            isReliable, textBytesFound, details = cld2.detect(text_string)
+            lang_codes_with_pct = []
+            if isReliable:
+                for (lang, lang_code, pct, score) in details:
+                    lang_code = lang_code.replace(' ','')
+                    if lang_code != 'un':
+                        pct = int(pct)
+                        if pct > 0:
+                            res = lang_code + ":" + str(pct)
+                            lang_codes_with_pct.append(res)
+                if len(lang_codes_with_pct) != 0:
+                    result = ",".join(lang_codes_with_pct)
+        except:
+            pass
+        return result
+
+    # get_simhash() //field "C"
+    #___________________________________________________________________________
+    def get_simhash(self, record):
+
+        from simhash import Simhash
+
+        result = '-'
+        text_string = self.extracted_text
+        if text_string is None:
+            return result
+        punct = '~`!@#$%^&*()-_=+[{]}|;:",<>./?\'\\'
+        punct_spaces = ' ' * len(punct)
+        punct_to_spaces = string.maketrans(punct, punct_spaces)
+        try:
+            text_string = text_string.strip().translate(punct_to_spaces)
+            terms = text_string.decode('utf-8','ignore').lower().split()
+            features = {k:sum(1 for _ in g) for k, g in groupby(sorted(terms))}
+            result = str(Simhash(features).value)
+        except:
+            pass
+        return result
+
+
     # get_file_name() //field "g"
     #___________________________________________________________________________
     def get_file_name(self, record):
@@ -685,6 +778,10 @@ class CDX_Writer(object):
                 self.response_code         = self.get_response_code(record, use_precalculated_value=False)
                 self.meta_tags             = self.parse_meta_tags(record)
 
+                if self.content_features:
+                    ### parse out text
+                    self.extracted_text        = self.extract_text(record)
+
                 s = u''
                 for field in self.format.split():
                     if not field in self.field_map:
@@ -727,6 +824,7 @@ if __name__ == '__main__':
                         all_records   = False,
                         screenshot_mode = False,
                         exclude_list    = None,
+                        content_features = False,
                         canonicalizer_options = []
                        )
 
@@ -739,6 +837,7 @@ if __name__ == '__main__':
     parser.add_option("--screenshot-mode", dest="screenshot_mode", action="store_true", help="Special Wayback Machine mode for handling WARCs containing screenshots")
     parser.add_option("--exclude-list", dest="exclude_list", help="File containing url prefixes to exclude")
     parser.add_option("--stats-file", dest="stats_file", help="Output json file containing statistics")
+    parser.add_option("--content-features", dest="content_features", action="store_true", help="Add content feature fields to the end of the CDX line")
     parser.add_option("--no-host-massage", dest="canonicalizer_options",
                       action='append_const', const=('host_massage', False),
                       help='Turn off host_massage (ex. stripping "www.")')
@@ -754,13 +853,13 @@ if __name__ == '__main__':
 
     cdx_writer = CDX_Writer(input_files[0], input_files[1],
                             format=options.format,
-                            use_full_path   = options.use_full_path,
-                            file_prefix     = options.file_prefix,
-                            all_records     = options.all_records,
-                            screenshot_mode = options.screenshot_mode,
-                            exclude_list    = options.exclude_list,
-                            stats_file      = options.stats_file,
-                            canonicalizer_options =
-                            options.canonicalizer_options
+                            use_full_path         = options.use_full_path,
+                            file_prefix           = options.file_prefix,
+                            all_records           = options.all_records,
+                            screenshot_mode       = options.screenshot_mode,
+                            exclude_list          = options.exclude_list,
+                            stats_file            = options.stats_file,
+                            content_features      = options.content_features,
+                            canonicalizer_options = options.canonicalizer_options
                            )
     cdx_writer.make_cdx()
