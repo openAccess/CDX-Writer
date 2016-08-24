@@ -1,3 +1,6 @@
 git+https://github.com/internetarchive/warctools.git@cdx-writer
 git+https://github.com/internetarchive/surt.git@cdx-writer
 chardet==1.0.1
+cld2-cffi==0.1.1
+lxml==3.6.0
+simhash==1.7.0
