@@ -69,19 +69,15 @@ class CDX_Writer(object):
                           'C': 'simhash'
                          }
 
-        self.file   = file
-        self.out_file = out_file
-        self.content_features = content_features
-        if self.content_features:
-            format = format + " Q C"
-        self.format = format
-        self.all_records  = all_records
-        self.screenshot_mode = screenshot_mode
-
+        self.file                  = file
+        self.out_file              = out_file
+        self.content_features      = content_features
+        self.format                = format
+        self.all_records           = all_records
+        self.screenshot_mode       = screenshot_mode
         self.canonicalizer_options = canonicalizer_options or {}
-
-        self.crlf_pattern = re.compile('\r?\n\r?\n')
-        self.response_pattern = re.compile('^application/http;\s*msgtype=response$', re.I)
+        self.crlf_pattern          = re.compile('\r?\n\r?\n')
+        self.response_pattern      = re.compile('^application/http;\s*msgtype=response$', re.I)
 
         #similar to what what the wayback uses:
         self.fake_build_version = "archive-commons.0.0.1-SNAPSHOT-20120112102659-python"
@@ -869,6 +865,17 @@ if __name__ == '__main__':
             parser.print_help()
             exit(-1)
 
+    #enable content features through flag
+    if options.content_features:
+        if 'Q' not in options.format:
+            options.format = options.format + " Q"
+        if 'C' not in options.format:
+            options.format = options.format + " C"
+
+    #enable content features through format
+    if 'Q' in options.format or 'C' in options.format:
+        options.content_features = True
+
     if options.content_features:
         if content_features_disabled:
             print("Unable to import libraries needed to extract content based features!")
@@ -879,7 +886,7 @@ if __name__ == '__main__':
         resource.setrlimit(resource.RLIMIT_AS, (soft_limit, hard_limit))
 
     cdx_writer = CDX_Writer(input_files[0], input_files[1],
-                            format=options.format,
+                            format                = options.format,
                             use_full_path         = options.use_full_path,
                             file_prefix           = options.file_prefix,
                             all_records           = options.all_records,
