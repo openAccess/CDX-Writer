@@ -14,7 +14,11 @@ dispatch loop in make_cdx using getattr().
 Jan 2016: Modified to include language
 May 2016: Modified to include simhash
 """
-from warctools import ArchiveRecord #from https://bitbucket.org/rajbot/warc-tools
+
+try:
+    from warctools import ArchiveRecord #from https://bitbucket.org/rajbot/warc-tools
+except:
+    from hanzo.warctools import ArchiveRecord #from https://bitbucket.org/rajbot/warc-tools
 from surt      import surt          #from https://github.com/rajbot/surt
 from surt      import DefaultIAURLCanonicalizer
 
@@ -31,6 +35,15 @@ import string
 from itertools import groupby
 from datetime  import datetime
 from optparse  import OptionParser
+
+content_features_disabled = False
+try:
+    import lxml.html
+    from lxml.html.clean import Cleaner
+    import cld2full as cld2
+    from simhash import Simhash
+except:
+    content_features_disabled = True
 
 class ParseError(Exception):
     pass
@@ -264,12 +277,18 @@ class CDX_Writer(object):
         robot_tags = [x.strip().lower() for x in robot_tags]
 
         s = ''
+
+
         if 'noarchive' in robot_tags:
             s += 'A'
         if 'nofollow' in robot_tags:
             s += 'F'
         if 'noindex' in robot_tags:
             s += 'I'
+
+        # IA-proprietary extension 'R' flag for warc/revisit records.
+        if 'revisit' == record.type:
+            s += 'R'
 
         # IA-proprietary extension 'P' flag for password protected pages.
         # crawler adds special header to WARC record, whose value consists
@@ -398,9 +417,6 @@ class CDX_Writer(object):
     #___________________________________________________________________________
     def extract_text(self, record):
 
-        import lxml.html
-        from lxml.html.clean import Cleaner
-
         result = None
         if not ('response' == record.type and self.response_code == '200'):
             return None
@@ -424,8 +440,6 @@ class CDX_Writer(object):
     # get_language_string() //field "Q"
     #___________________________________________________________________________
     def get_language_string(self, record):
-
-        import cld2full as cld2
 
         result = '-'
         text_string = self.extracted_text
@@ -453,8 +467,6 @@ class CDX_Writer(object):
     # get_simhash() //field "C"
     #___________________________________________________________________________
     def get_simhash(self, record):
-
-        from simhash import Simhash
 
         result = '-'
         text_string = self.extracted_text
@@ -532,8 +544,13 @@ class CDX_Writer(object):
         if use_precalculated_value:
             return self.mime_type
 
-        if 'response' == record.type and self.is_response(record.content_type):
-            mime_type = self.parse_http_content_type_header(record)
+        record_mime_type = '-'
+
+        if self.is_response(record.content_type):
+            record_mime_type = self.parse_http_content_type_header(record)
+
+        if 'response' == record.type and record_mime_type != '-':
+            mime_type = record_mime_type
         elif 'response' == record.type:
             if record.content_type is None:
                 mime_type = 'unk'
@@ -545,7 +562,7 @@ class CDX_Writer(object):
         elif self.screenshot_mode and 'metadata' == record.type:
             mime_type = record.content[0]
         else:
-            mime_type = 'warc/'+record.type
+            mime_type = record_mime_type
 
         try:
             mime_type = mime_type.decode('ascii')
@@ -684,8 +701,8 @@ class CDX_Writer(object):
         if use_precalculated_value:
             return self.response_code
 
-        if 'response' != record.type:
-            return '-'
+        #if 'response' != record.type:
+        #    return '-'
 
         m = re.match("HTTP(?:/\d\.\d)? (\d+)", record.content[1])
         if m:
@@ -701,7 +718,7 @@ class CDX_Writer(object):
         split in the same way.
         """
 
-        if 'response' == record.type and record.content[1].startswith('HTTP'):
+        if ('response' == record.type or 'revisit' == record.type) and record.content[1].startswith('HTTP'):
             try:
                 headers, content = self.crlf_pattern.split(record.content[1], 1)
             except ValueError:
@@ -850,6 +867,10 @@ if __name__ == '__main__':
         else:
             parser.print_help()
             exit(-1)
+
+    if content_features_disabled and options.content_features:
+        print("Unable to import libraries needed to extract content based features!")
+        exit(-1)
 
     cdx_writer = CDX_Writer(input_files[0], input_files[1],
                             format=options.format,
