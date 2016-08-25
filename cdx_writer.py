@@ -32,6 +32,7 @@ import json
 import urllib
 import urlparse
 import string
+import resource
 from itertools import groupby
 from datetime  import datetime
 from optparse  import OptionParser
@@ -868,9 +869,14 @@ if __name__ == '__main__':
             parser.print_help()
             exit(-1)
 
-    if content_features_disabled and options.content_features:
-        print("Unable to import libraries needed to extract content based features!")
-        exit(-1)
+    if options.content_features:
+        if content_features_disabled:
+            print("Unable to import libraries needed to extract content based features!")
+            exit(-1)
+        # set memory limits on content feature extraction
+        soft_limit = 800 * 1000000
+        hard_limit = 900 * 1000000
+        resource.setrlimit(resource.RLIMIT_AS, (soft_limit, hard_limit))
 
     cdx_writer = CDX_Writer(input_files[0], input_files[1],
                             format=options.format,
