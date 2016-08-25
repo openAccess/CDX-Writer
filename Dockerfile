@@ -15,9 +15,9 @@ RUN apt-get update && apt-get install -y \
     git
 
 ADD requirements.txt /
+ADD cdx_writer.py /
 
 RUN pip install -r /requirements.txt
 
 CMD ["bash"]
-
 
