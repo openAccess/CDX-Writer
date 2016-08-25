@@ -20,6 +20,8 @@ Options:
                                 containing screenshots
     --exclude-list=EXCLUDE_LIST File containing url prefixes to exclude
     --stats-file=STATS_FILE     Output json file containing statistics
+    --content-features          Add content feature fields to the end of the CDX line
+
 
 
 Output is written to stdout. The first line of output is the CDX header.
@@ -40,6 +42,8 @@ The supported format options are:
     m mime type of original document *
     r redirect *
     s response code *
+    Q language string
+    C simhash
 
     * in alexa-made dat file
     ** in alexa-made dat file meta-data line
@@ -50,8 +54,11 @@ http://www.archive.org/web/researcher/cdx_legend.php
 
 ## Installation
 
-Unfortunately, this script is not propery packaged and cannot be installed via pip. See the [.travis.yml](https://github.com/rajbot/CDX-Writer/blob/master/.travis.yml) file for hints on how to get it running.
+Unfortunately, this script is not properly packaged and cannot be installed via pip. See the [.travis.yml](https://github.com/rajbot/CDX-Writer/blob/master/.travis.yml) file for hints on how to get it running.
 
+## Docker (optional)
+
+Use the Dockerfile provided to build a Docker image and run the indexer in a Docker container
 
 ## Differences between cdx_writer.py and archive-access cdx files
 The CDX files produced by the [archive-access](http://sourceforge.net/projects/archive-access/)
