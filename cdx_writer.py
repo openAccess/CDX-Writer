@@ -17,7 +17,7 @@ May 2016: Modified to include simhash
 
 try:
     from warctools import ArchiveRecord #from https://bitbucket.org/rajbot/warc-tools
-except:
+except ImportError:
     from hanzo.warctools import ArchiveRecord #from https://bitbucket.org/rajbot/warc-tools
 from surt      import surt          #from https://github.com/rajbot/surt
 from surt      import DefaultIAURLCanonicalizer
@@ -43,7 +43,7 @@ try:
     from lxml.html.clean import Cleaner
     import cld2full as cld2
     from simhash import Simhash
-except:
+except ImportError:
     content_features_disabled = True
 
 class ParseError(Exception):
