@@ -1,5 +1,6 @@
 git+https://github.com/internetarchive/warctools.git@cdx-writer
 git+https://github.com/internetarchive/surt.git@cdx-writer
+chardet
 cld2-cffi
 lxml
 simhash
