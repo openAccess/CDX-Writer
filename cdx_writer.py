@@ -15,12 +15,9 @@ Jan 2016: Modified to include language
 May 2016: Modified to include simhash
 """
 
-try:
-    from warctools import ArchiveRecord #from https://bitbucket.org/rajbot/warc-tools
-except ImportError:
-    from hanzo.warctools import ArchiveRecord #from https://bitbucket.org/rajbot/warc-tools
-from surt      import surt          #from https://github.com/rajbot/surt
-from surt      import DefaultIAURLCanonicalizer
+from hanzo.warctools import ArchiveRecord # from https://github.com/internetarchive/warctools.git@cdx-writer
+from surt import surt # from https://github.com/internetarchive/surt.git@cdx-writer
+from surt import DefaultIAURLCanonicalizer
 
 import os
 import re
