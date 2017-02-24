@@ -15,9 +15,12 @@ Jan 2016: Modified to include language
 May 2016: Modified to include simhash
 """
 
-from hanzo.warctools import ArchiveRecord # from https://github.com/internetarchive/warctools.git@cdx-writer
-from surt import surt # from https://github.com/internetarchive/surt.git@cdx-writer
-from surt import DefaultIAURLCanonicalizer
+try:
+    from warctools import ArchiveRecord #from https://bitbucket.org/rajbot/warc-tools
+except ImportError:
+    from hanzo.warctools import ArchiveRecord #from https://bitbucket.org/rajbot/warc-tools
+from surt      import surt          #from https://github.com/rajbot/surt
+from surt      import DefaultIAURLCanonicalizer
 
 import os
 import re
@@ -63,7 +66,8 @@ class CDX_Writer(object):
                           'r': 'redirect',
                           's': 'response code',
                           'Q': 'language string',
-                          'C': 'simhash'
+                          'C': 'simhash',
+                          'T': 'sha256 checksum'
                          }
 
         self.file                  = file
@@ -528,6 +532,22 @@ class CDX_Writer(object):
             h = hashlib.sha1(record.content[1])
             return base64.b32encode(h.digest())
 
+
+    # get_sha256_checksum() //field "T"
+    #___________________________________________________________________________
+    def get_sha256_checksum(self, record):
+        """Return sha256
+        For revisit records, return '-'
+        """
+        if 'revisit' == record.type:
+            return '-'
+        elif 'response' == record.type and self.content is not None:
+            h = hashlib.sha256(self.content)
+            return h.hexdigest()
+        else:
+            h = hashlib.sha256(record.content[1])
+            return h.hexdigest()
+
     # get_mime_type() //field "m"
     #___________________________________________________________________________
     def get_mime_type(self, record, use_precalculated_value=True):
@@ -868,6 +888,8 @@ if __name__ == '__main__':
             options.format = options.format + " Q"
         if 'C' not in options.format:
             options.format = options.format + " C"
+        if 'T' not in options.format:
+            options.format = options.format + " T"
 
     #enable content features through format
     if 'Q' in options.format or 'C' in options.format:
