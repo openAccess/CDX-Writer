@@ -15,10 +15,7 @@ Jan 2016: Modified to include language
 May 2016: Modified to include simhash
 """
 
-try:
-    from warctools import ArchiveRecord #from https://bitbucket.org/rajbot/warc-tools
-except ImportError:
-    from hanzo.warctools import ArchiveRecord #from https://bitbucket.org/rajbot/warc-tools
+from hanzo.warctools import ArchiveRecord #from https://bitbucket.org/rajbot/warc-tools
 from surt      import surt          #from https://github.com/rajbot/surt
 from surt      import DefaultIAURLCanonicalizer
 
@@ -892,7 +889,7 @@ if __name__ == '__main__':
             options.format = options.format + " T"
 
     #enable content features through format
-    if 'Q' in options.format or 'C' in options.format:
+    if 'Q' in options.format or 'C' in options.format or 'T' in options.format:
         options.content_features = True
 
     if options.content_features:
