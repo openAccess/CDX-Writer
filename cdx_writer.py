@@ -22,6 +22,12 @@ import chardet
 import hashlib
 import json
 import urlparse
+import lxml.html
+from lxml.html.clean import Cleaner
+import cld2full as cld2
+import simhash
+import resource
+import unicodedata
 from datetime import datetime
 from operator import attrgetter
 from optparse import OptionParser
@@ -351,6 +357,8 @@ class ResponseHandler(HttpHandler):
         self.lxml_parse_limit = cdx_writer.lxml_parse_limit
         self.headers, self.content = self.parse_headers_and_content()
         self.meta_tags = self.parse_meta_tags()
+        self.disable_text_features = cdx_writer.disable_text_features
+        self.parsed_text = self.parse_text_from_content()
 
     response_pattern = re.compile('application/http;\s*msgtype=response$', re.I)
 
@@ -411,6 +419,28 @@ class ResponseHandler(HttpHandler):
         content_type = self.record.content_type
         return content_type and self.response_pattern.match(content_type)
 
+    def parse_text_from_content(self):
+        """Returns UTF-8 encoded parsed out text from text content
+        """
+        if self.disable_text_features or not self.is_response or not self.mime_type.startswith('text'):
+            return None
+        if self.mime_type == 'text/html':
+            if self.record.content_length > self.lxml_parse_limit:
+                return None
+            html_string = self.content
+            cleaner = Cleaner()
+            cleaner.javascript = True
+            cleaner.style = True
+            try:
+                root = lxml.html.fromstring(html_string)
+                root = cleaner.clean_html(root)
+                return root.text_content().encode('utf-8')
+            except:
+                return None
+        else:
+            #non HTML case
+            return self.content
+
     @property
     def mime_type(self):
         if self.is_response():
@@ -457,6 +487,65 @@ class ResponseHandler(HttpHandler):
         else:
             h = hashlib.sha1(self.record.content[1])
             return base64.b32encode(h.digest())
+
+    @property
+    def sha_256_checksum(self):
+        if not self.is_response():
+            return None
+        elif self.content is not None:
+            return hashlib.sha256(self.content).hexdigest()
+        else:
+            return hashlib.sha256(record.content[1]).hexdigest()
+
+    @property
+    def language_codes(self):
+        if self.parsed_text is None:
+            return None
+        text_string = self.parsed_text
+        is_reliable = None
+        details = None
+        lang_codes_with_pct = []
+        try:
+            is_reliable, text_bytes_found, details = cld2.detect(text_string)
+            if is_reliable:
+                for (lang, lang_code, pct, score) in details:
+                    lang_code = lang_code.replace(' ','')
+                    if lang_code != 'un':
+                        pct = int(pct)
+                        if pct > 0:
+                            res = lang_code + ":" + str(pct)
+                            lang_codes_with_pct.append(res)
+        except:
+            pass
+        if lang_codes_with_pct:
+            return ",".join(lang_codes_with_pct)
+        else:
+            return None
+
+    @property
+    def simhash(self):
+        if self.parsed_text is None:
+            return None
+        try:
+            text_string = self.parsed_text.decode('utf-8')
+        except UnicodeError:
+            return None
+        #strip punctuation
+        text_chars = []
+        for char in text_string:
+            if unicodedata.category(char).startswith('P'):
+                char = " "
+            text_chars.append(char)
+        text_string = re.sub(r'\s+', ' ', ''.join(text_chars))
+        #lower case and tokenize for feature extraction
+        try:
+            tokens = re.split(r'\W+', text_string.lower(), flags=re.UNICODE)
+        except ValueError:
+            return None
+        shingle_length = 4
+        shingles = [''.join(shingle) for shingle in simhash.shingle(''.join(tokens), shingle_length)]
+        hashes = [simhash.unsigned_hash(s.encode('utf8')) for s in shingles]
+        return str(simhash.compute(hashes))
 
     def parse_meta_tags(self):
         """We want to parse meta tags in <head>, even if not direct children.
@@ -572,6 +661,18 @@ class RevisitHandler(HttpHandler):
         if digest is None:
             return None
         return digest.replace('sha1:', '')
+    
+    @property
+    def language_codes(self):
+        return None
+    
+    @property
+    def simhash(self):
+        return None
+
+    @property
+    def sha_256_checksum(self):
+        return None
 
 class ScreenshotHandler(RecordHandler):
     @property
@@ -677,7 +778,7 @@ class RecordDispatcher(object):
         return None
 
 class CDX_Writer(object):
-    def __init__(self, file, out_file=sys.stdout, format="N b a m s k r M S V g", use_full_path=False, file_prefix=None, all_records=False, screenshot_mode=False, exclude_list=None, stats_file=None, canonicalizer_options=None):
+    def __init__(self, file, out_file=sys.stdout, format="N b a m s k r M S V g Q C T", use_full_path=False, file_prefix=None, all_records=False, screenshot_mode=False, exclude_list=None, stats_file=None, disable_text_features=False, canonicalizer_options=None):
         """This class is instantiated for each web archive file and generates
         CDX from it.
 
@@ -704,11 +805,15 @@ class CDX_Writer(object):
                           'm': 'mime type',
                           'r': 'redirect',
                           's': 'response code',
+                          'Q': 'language codes',
+                          'C': 'simhash',
+                          'T': 'sha 256 checksum'
                          }
 
         self.file   = file
         self.out_file = out_file
         self.format = format
+        self.disable_text_features = disable_text_features
 
         self.fieldgetter = self._build_fieldgetter(self.format.split())
 
@@ -844,13 +949,14 @@ class CDX_Writer(object):
 def main(args):
 
     parser = OptionParser(usage="%prog [options] warc.gz [output_file.cdx]")
-    parser.set_defaults(format        = "N b a m s k r M S V g",
-                        use_full_path = False,
-                        file_prefix   = None,
-                        all_records   = False,
-                        screenshot_mode = False,
-                        exclude_list    = None,
-                        canonicalizer_options = []
+    parser.set_defaults(format                  = "N b a m s k r M S V g Q C T",
+                        use_full_path           = False,
+                        file_prefix             = None,
+                        all_records             = False,
+                        screenshot_mode         = False,
+                        exclude_list            = None,
+                        disable_text_features   = False,
+                        canonicalizer_options   = []
                        )
 
     parser.add_option("--format",  dest="format", help="A space-separated list of fields [default: '%default']")
@@ -862,6 +968,7 @@ def main(args):
     parser.add_option("--screenshot-mode", dest="screenshot_mode", action="store_true", help="Special Wayback Machine mode for handling WARCs containing screenshots")
     parser.add_option("--exclude-list", dest="exclude_list", help="File containing url prefixes to exclude")
     parser.add_option("--stats-file", dest="stats_file", help="Output json file containing statistics")
+    parser.add_option("--disable-text-features", dest="disable_text_features", action="store_true", help="By default, we extract text based features like language codes and simhash. Use this flag to disable this behavior in certain cases (e.g. if it's taking too long to extract)")
     parser.add_option("--no-host-massage", dest="canonicalizer_options",
                       action='append_const', const=('host_massage', False),
                       help='Turn off host_massage (ex. stripping "www.")')
@@ -875,14 +982,21 @@ def main(args):
             parser.print_help()
             return -1
 
+    if not options.disable_text_features:
+        # set memory limits on text feature extraction
+        soft_limit = 800 * 1000000
+        hard_limit = 900 * 1000000
+        resource.setrlimit(resource.RLIMIT_AS, (soft_limit, hard_limit))
+
     cdx_writer = CDX_Writer(input_files[0], input_files[1],
-                            format=options.format,
-                            use_full_path   = options.use_full_path,
-                            file_prefix     = options.file_prefix,
-                            all_records     = options.all_records,
-                            screenshot_mode = options.screenshot_mode,
-                            exclude_list    = options.exclude_list,
-                            stats_file      = options.stats_file,
+                            format                  = options.format,
+                            use_full_path           = options.use_full_path,
+                            file_prefix             = options.file_prefix,
+                            all_records             = options.all_records,
+                            screenshot_mode         = options.screenshot_mode,
+                            exclude_list            = options.exclude_list,
+                            stats_file              = options.stats_file,
+                            disable_text_features   = options.disable_text_features,
                             canonicalizer_options =
                             options.canonicalizer_options
                            )
