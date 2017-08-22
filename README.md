@@ -1,7 +1,5 @@
 # cdx_writer.py
-Python script to create CDX index files of WARC data.
-
-[![Build Status](https://travis-ci.org/internetarchive/CDX-Writer.png?branch=master)](https://travis-ci.org/internetarchive/CDX-Writer)
+Python script to create "extended" CDX index files of WARC data.
 
 ## Usage
 Usage: `cdx_writer.py [options] warc.gz`
@@ -9,7 +7,7 @@ Usage: `cdx_writer.py [options] warc.gz`
 Options:
 
     -h, --help                  show this help message and exit
-    --format=FORMAT             A space-separated list of fields [default: 'N b a m s k r M S V g']
+    --format=FORMAT             A space-separated list of fields [default: 'N b a m s k r M S V g Q C T']
     --use-full-path             Use the full path of the warc file in the 'g' field
     --file-prefix=FILE_PREFIX   Path prefix for warc file name in the 'g' field.
                                 Useful if you are going to relocate the warc.gz file
@@ -20,6 +18,9 @@ Options:
                                 containing screenshots
     --exclude-list=EXCLUDE_LIST File containing url prefixes to exclude
     --stats-file=STATS_FILE     Output json file containing statistics
+    --disable-text-features     By default, we extract text based features like language codes and simhash.
+                                Use this flag to disable this behavior in certain cases
+                                (e.g. if it's taking too long to extract)
 
 
 Output is written to stdout. The first line of output is the CDX header.
@@ -40,17 +41,15 @@ The supported format options are:
     m mime type of original document *
     r redirect *
     s response code *
+    Q language codes
+    C simhash
+    T sha-256 checksum
 
     * in alexa-made dat file
     ** in alexa-made dat file meta-data line
 
 More information about the CDX format syntax can be found here:
 http://www.archive.org/web/researcher/cdx_legend.php
-
-
-## Installation
-
-Unfortunately, this script is not propery packaged and cannot be installed via pip. See the [.travis.yml](https://github.com/rajbot/CDX-Writer/blob/master/.travis.yml) file for hints on how to get it running.
 
 
 ## Differences between cdx_writer.py and archive-access cdx files
@@ -81,7 +80,6 @@ returns 'unk' in this case. Example WARC Record (returns "close" as the mime typ
 * archive-access version doesn't parse multiple html meta tags, only the first one
 * archive-access misses FI meta tags sometimes
 * cdx_writer.py always returns tags in A, F, I order. archive-access does not use a consistent order
-
 
 ### Differences in HTTP Response Codes
 * archive-access returns response code 0 if HTTP header line contains unicode:
