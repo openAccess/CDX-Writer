@@ -420,10 +420,11 @@ class ResponseHandler(HttpHandler):
         return content_type and self.response_pattern.match(content_type)
 
     def parse_text_from_content(self):
-        """Returns UTF-8 encoded parsed out text from text content
+        """Returns parsed out text
         """
         if self.disable_text_features or not self.is_response or not self.mime_type.startswith('text'):
             return None
+        parsed_text = None
         if self.mime_type == 'text/html':
             if self.record.content_length > self.lxml_parse_limit:
                 return None
@@ -434,13 +435,14 @@ class ResponseHandler(HttpHandler):
             try:
                 root = lxml.html.fromstring(html_string)
                 root = cleaner.clean_html(root)
-                return root.text_content().encode('utf-8')
+                parsed_text = root.text_content()
             except:
-                return None
+                pass
         else:
             #non HTML case
-            return self.content
-
+            parsed_text = self.content
+        return parsed_text
+            
     @property
     def mime_type(self):
         if self.is_response():
@@ -501,7 +503,10 @@ class ResponseHandler(HttpHandler):
     def language_codes(self):
         if self.parsed_text is None:
             return None
-        text_string = self.parsed_text
+        try:
+            text_string = self.parsed_text.encode('utf-8')
+        except:
+            return None
         is_reliable = None
         details = None
         lang_codes_with_pct = []
@@ -527,7 +532,7 @@ class ResponseHandler(HttpHandler):
         if self.parsed_text is None:
             return None
         try:
-            text_string = self.parsed_text.decode('utf-8')
+            text_string = self.parsed_text.encode('utf-8').decode('utf-8')
         except UnicodeError:
             return None
         #strip punctuation
