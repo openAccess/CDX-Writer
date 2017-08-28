@@ -420,8 +420,6 @@ class ResponseHandler(HttpHandler):
         return content_type and self.response_pattern.match(content_type)
 
     def parse_text_from_content(self):
-        """Returns parsed out text
-        """
         if self.disable_text_features or not self.is_response or not self.mime_type.startswith('text'):
             return None
         parsed_text = None
@@ -439,8 +437,12 @@ class ResponseHandler(HttpHandler):
             except:
                 pass
         else:
-            #non HTML case
             parsed_text = self.content
+        if isinstance(parsed_text, str):
+            try:
+                parsed_text = parsed_text.decode('utf-8', 'ignore')
+            except UnicodeError:
+                parsed_text = None
         return parsed_text
             
     @property
@@ -503,8 +505,9 @@ class ResponseHandler(HttpHandler):
     def language_codes(self):
         if self.parsed_text is None:
             return None
+        #cld2 expects utf-8 encoded bytes
         try:
-            text_string = self.parsed_text.encode('utf-8')
+            text_string = self.parsed_text.encode('utf-8', 'ignore')
         except:
             return None
         is_reliable = None
@@ -531,10 +534,7 @@ class ResponseHandler(HttpHandler):
     def simhash(self):
         if self.parsed_text is None:
             return None
-        try:
-            text_string = self.parsed_text.encode('utf-8').decode('utf-8')
-        except UnicodeError:
-            return None
+        text_string = self.parsed_text
         #strip punctuation
         text_chars = []
         for char in text_string:
@@ -547,6 +547,7 @@ class ResponseHandler(HttpHandler):
             tokens = re.split(r'\W+', text_string.lower(), flags=re.UNICODE)
         except ValueError:
             return None
+        #shingles of size 4
         shingle_length = 4
         shingles = [''.join(shingle) for shingle in simhash.shingle(''.join(tokens), shingle_length)]
         hashes = [simhash.unsigned_hash(s.encode('utf8')) for s in shingles]
