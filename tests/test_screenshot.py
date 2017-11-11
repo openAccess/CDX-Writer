@@ -77,7 +77,7 @@ def test_sceenshot_regular(block_digest, tmpdir):
 
     cdxout = tmpdir / 'test.cdx'
     with tmpdir.as_cwd():
-        cdx_writer = CDX_Writer(warc.basename, cdxout.basename, screenshot_mode=True)
+        cdx_writer = CDX_Writer(warc.basename, cdxout.basename, dispatch_mode='screenshot')
         cdx_writer.make_cdx()
 
     assert cdxout.isfile()
