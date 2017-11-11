@@ -618,94 +618,131 @@ class FtpHandler(RecordHandler):
         return base64.b32encode(h.digest())
 
 class RecordDispatcher(object):
-    def __init__(self, all_records=False, screenshot_mode=False):
-        self.dispatchers = []
-        if screenshot_mode:
-            self.dispatchers.append(self.dispatch_screenshot)
+    _cache = None
+    def dispatch(self, record, offset, cdx_writer):
+        record_type = record.type
+        if self._cache is None:
+            self._cache = {}
+        if record_type in self._cache:
+            disp = self._cache[record_type]
         else:
-            self.dispatchers.append(self.dispatch_http)
-            self.dispatchers.append(self.dispatch_resource)
-
-        if all_records:
-            self.dispatchers.append(self.dispatch_other)
-
-    def dispatch_screenshot(self, record):
-        if record.type == 'metadata':
-            content_type = record.content_type
-            if content_type and content_type.startswith('image/'):
-                return ScreenshotHandler
+            attr = "dispatch_{}".format(record_type)
+            disp = getattr(self, attr, None)
+            if disp is None:
+                disp = getattr(self, "dispatch_any", None)
+            self._cache[record_type] = disp
+        if disp:
+            handler_factory = disp(record)
+            if handler_factory:
+                return handler_factory(record, offset=offset, cdx_writer=cdx_writer)
         return None
 
-    def dispatch_http(self, record):
+class DefaultDispatcher(RecordDispatcher):
+    def dispatch_response(self, record):
+        # probbaly it's better to test for "dns:" scheme?
         if record.content_type in ('text/dns',):
             return None
-        if record.type == 'response':
-            # exclude 304 Not Modified responses (unless --all-records)
-            m = ResponseHandler.RE_RESPONSE_LINE.match(record.content[1])
-            if m and m.group('statuscode') == '304':
+        # exclude 304 Not Modified responses (unless --all-records)
+        m = ResponseHandler.RE_RESPONSE_LINE.match(record.content[1])
+        if m and m.group('statuscode') == '304':
+            return None
+        # discard ARC records for failed liveweb proxy
+        ipaddr = record.get_header('IP-address')
+        if ipaddr == '0.0.0.0':
+            # some ARcs have valid captures with IP-Address=0.0.0.0
+            # we need to check further; no HTTP version and 50{2,4}
+            # status.
+            if (m and m.group('version') is None and
+                m.group('statuscode') in ('502', '504')):
                 return None
-            # discard ARC records for failed liveweb proxy
-            ipaddr = record.get_header('IP-address')
-            if ipaddr == '0.0.0.0':
-                # some ARcs have valid captures with IP-Address=0.0.0.0
-                # we need to check further; no HTTP version and 50{2,4}
-                # status.
-                if (m and m.group('version') is None and
-                    m.group('statuscode') in ('502', '504')):
-                    return False
-            return ResponseHandler
-        elif record.type == 'revisit':
-            # exclude 304 Not Modified revisits (unless --all-records)
-            if record.get_header('WARC-Profile') and record.get_header(
-                    'WARC-Profile').endswith('/revisit/server-not-modified'):
-                return None
-            return RevisitHandler
-        return None
+        return ResponseHandler
+
+    def dispatch_revisit(self, record):
+        # exclude 304 Not Modified revisits (unless --all-records)
+        if record.get_header('WARC-Profile') and record.get_header(
+                'WARC-Profile').endswith('/revisit/server-not-modified'):
+            return None
+        return RevisitHandler
 
     def dispatch_resource(self, record):
-        if record.type == 'resource':
-            # wget saves resource records with wget agument and logging
-            # output at the end of the WARC. those need to be skipped.
-            if record.url.startswith('ftp://'):
-                return FtpHandler
-            elif record.url.startswith(('http://', 'https://')):
-                return ResourceHandler
+        # wget saves resource records with wget agument and logging
+        # output at the end of the WARC. those need to be skipped.
+        if record.url.startswith('ftp://'):
+            return FtpHandler
+        elif record.url.startswith(('http://', 'https://')):
+            return ResourceHandler
         return None
 
-    def dispatch_other(self, record):
-        if record.type == 'warcinfo':
-            return WarcinfoHandler
-        elif record.type == 'response':
-            return ResponseHandler
-        elif record.type == 'revisit':
-            return RevisitHandler
-        else:
-            return RecordHandler
+class AllDispatcher(DefaultDispatcher):
 
-    def get_handler(self, record, **kwargs):
-        for disp in self.dispatchers:
-            handler = disp(record)
-            if handler is False:
-                break
-            if handler:
-                return handler(record, **kwargs)
+    def dispatch_response(self, record):
+        return ResponseHandler
+
+    def dispatch_revisit(self, record):
+        return RevisitHandler
+
+    def dispatch_resource(self, record):
+        disp = super(AllDispatcher, self).dispatch_resource(record)
+        return disp or RecordHandler
+
+    def dispatch_warcinfo(self, record):
+        return WarcinfoHandler
+
+    def dispatch_any(self, record):
+        return RecordHandler
+
+class ScreenshotDispatcher(RecordDispatcher):
+    def dispatch_metadata(self, record):
+        content_type = record.content_type
+        if content_type and content_type.startswith('image/'):
+            return ScreenshotHandler
         return None
+
+class PrefixExclusion(object):
+    def __init__(self, exclude_list, canonicalizer):
+        """Default exclusion implementation that reads URLs from file
+        `exclude_list` to compile a list of canonicalized prefixes to be
+        matched against ``massaged_url`` of each record.
+
+        :param exclude_list: path of file containing list of URLs to be excluded.
+        :param canonicalizer: URL canonicalizer
+        """
+        self.urlkey = canonicalizer
+        self.excludes = []
+        with open(exclude_list, 'r') as f:
+            for line in f:
+                if '' == line.strip():
+                    continue
+                url = line.split()[0]
+                self.excludes.append(self.urlkey(url))
+
+    def excluded(self, urlkey):
+        # XXX linear search - could be a little more efficient
+        for prefix in self.excludes:
+            if urlkey.startswith(prefix):
+                return True
+        return False
 
 class CDX_Writer(object):
-    def __init__(self, file, out_file=sys.stdout, format="N b a m s k r M S V g", use_full_path=False, file_prefix=None, all_records=False, screenshot_mode=False, exclude_list=None, stats_file=None, canonicalizer_options=None):
+    _mode_dispatcher = {
+        'default': DefaultDispatcher(),
+        'all': AllDispatcher(),
+
+        'screenshot': ScreenshotDispatcher()
+    }
+
+    def __init__(self, file, out_file=sys.stdout, format="N b a m s k r M S V g",
+                 warc_path=None, dispatch_mode=None,
+                 exclude_list=None, canonicalizer=None):
         """This class is instantiated for each web archive file and generates
         CDX from it.
 
         :param file: input web archive file name
         :param out_file: file object to write CDX to
         :param format: CDX field specification string.
-        :param use_full_path: if ``True``, use absolute path of `file` for ``g``
-        :param file_prefix: prefix for `file` (effective only when `use_full_path`
-            is ``False``)
-        :param all_records: if ``True``, process all records
-        :param screenshot_mode: ``True`` turns on IA-proprietary screenshot mode
+        :param warc_path: filename field value (literal or callable taking `file` as an argument)
+        :param dispatch_mode: string representing dispatchers to use
         :param exclude_list: a file containing a list of excluded URLs
-        :param stat_file: a filename to write out statistics.
         :param canonicalizer_options: URL canonicalizer options
         """
         self.field_map = {'M': 'AIF meta tags',
@@ -721,47 +758,28 @@ class CDX_Writer(object):
                           's': 'response code',
                          }
 
-        self.file   = file
+        self.file = file
         self.out_file = out_file
         self.format = format
 
         self.fieldgetter = self._build_fieldgetter(self.format.split())
 
-        self.dispatcher = RecordDispatcher(
-            all_records=all_records, screenshot_mode=screenshot_mode)
+        self.dispatcher = self._mode_dispatcher[dispatch_mode or 'default']
+        # self.dispatcher = RecordDispatcher(
+        #     all_records=all_records, screenshot_mode=screenshot_mode)
 
-        self.canonicalizer_options = canonicalizer_options or {}
+        self.urlkey = canonicalizer or surt
 
         #Large html files cause lxml to segfault
         #problematic file was 154MB, we'll stop at 5MB
         self.lxml_parse_limit = 5 * 1024 * 1024
 
-        if use_full_path:
-            self.warc_path = os.path.abspath(file)
-        elif file_prefix:
-            self.warc_path = os.path.join(file_prefix, file)
+        if callable(warc_path):
+            self.warc_path = warc_path(file)
         else:
-            self.warc_path = file
+            self.warc_path = warc_path or file
 
-        if exclude_list:
-            if not os.path.exists(exclude_list):
-                raise IOError("Exclude file not found")
-            self.excludes = []
-            with open(exclude_list, 'r') as f:
-                for line in f:
-                    if '' == line.strip():
-                        continue
-                    url = line.split()[0]
-                    self.excludes.append(self.urlkey(url))
-        else:
-            self.excludes = None
-
-        if stats_file:
-            if os.path.exists(stats_file):
-                raise IOError("Stats file already exists")
-            self.stats_file = stats_file
-        else:
-            self.stats_file = None
+        self.exclusion = exclude_list or False
 
     def _build_fieldgetter(self, fieldcodes):
         """Return a callable that collects CDX field values from a
@@ -777,48 +795,28 @@ class CDX_Writer(object):
             attrs.append(self.field_map[field].replace(' ', '_').lower())
         return attrgetter(*attrs)
 
-    def urlkey(self, url):
-        """compute urlkey from `url`."""
-        return surt(url, **dict(self.canonicalizer_options))
+    def urlkey(self):
+        # replaced in __init__
+        pass
 
-    # should_exclude()
-    #___________________________________________________________________________
-    def should_exclude(self, surt_url):
-        if not self.excludes:
-            return False
-
-        for prefix in self.excludes:
-            if surt_url.startswith(prefix):
-                return True
-
-        return False
+    def should_exclude(self, urlkey):
+        return self.exclusion and self.exclusion.excluded(urlkey)
 
 
-    # make_cdx()
-    #___________________________________________________________________________
     def make_cdx(self):
-        close_out_file = False
-        if isinstance(self.out_file, basestring):
-            self.out_file = open(self.out_file, 'wb')
-            close_out_file = True
-
-        stats = {
+        self.stats = {
             'num_records_processed': 0,
             'num_records_included': 0,
             'num_records_filtered': 0,
-            }
-        try:
-            self._make_cdx(stats)
-        finally:
-            if close_out_file:
-                self.out_file.close()
+        }
+        if hasattr(self.out_file, "write"):
+            self._make_cdx(self.out_file, self.stats)
+        else:
+            with open(self.out_file, "wb") as w:
+                self._make_cdx(w, self.stats)
 
-            if self.stats_file is not None:
-                with open(self.stats_file, 'w') as f:
-                    json.dump(stats, f, indent=4)
-
-    def _make_cdx(self, stats):
-        self.out_file.write(b' CDX ' + self.format + b'\n') #print header
+    def _make_cdx(self, out_file, stats):
+        out_file.write(b' CDX ' + self.format + b'\n') #print header
 
         fh = ArchiveRecord.open_archive(self.file, gzip="auto", mode="r")
         for (offset, record, errors) in fh.read_records(limit=None, offsets=True):
@@ -828,7 +826,7 @@ class CDX_Writer(object):
                 continue # tail
 
             stats['num_records_processed'] += 1
-            handler = self.dispatcher.get_handler(record, offset=offset, cdx_writer=self)
+            handler = self.dispatcher.dispatch(record, offset, self)
             if not handler:
                 continue
 
@@ -848,7 +846,7 @@ class CDX_Writer(object):
             # self.mime_type             = self.get_mime_type(record, use_precalculated_value=False)
 
             values = [b'-' if v is None else v for v in self.fieldgetter(handler)]
-            self.out_file.write(b' '.join(values) + b'\n')
+            out_file.write(b' '.join(values) + b'\n')
             #record.dump()
             stats['num_records_included'] += 1
 
@@ -873,8 +871,10 @@ def main(args):
     parser.add_option("--file-prefix",   dest="file_prefix", help="Path prefix for warc file name in the 'g' field."
                       " Useful if you are going to relocate the warc.gz file after processing it."
                      )
-    parser.add_option("--all-records",   dest="all_records", action="store_true", help="By default we only index http responses. Use this flag to index all WARC records in the file")
-    parser.add_option("--screenshot-mode", dest="screenshot_mode", action="store_true", help="Special Wayback Machine mode for handling WARCs containing screenshots")
+    parser.add_option("--all-records", dest="dispatch_mode", action="store_const", const="all",
+                      help="By default we only index http responses. Use this flag to index all WARC records in the file")
+    parser.add_option("--screenshot-mode", dest="dispatch_mode", action="store_const", const="screenshot",
+                      help="Special Wayback Machine mode for handling WARCs containing screenshots")
     parser.add_option("--exclude-list", dest="exclude_list", help="File containing url prefixes to exclude")
     parser.add_option("--stats-file", dest="stats_file", help="Output json file containing statistics")
     parser.add_option("--no-host-massage", dest="canonicalizer_options",
@@ -890,18 +890,32 @@ def main(args):
             parser.print_help()
             return -1
 
+    if options.use_full_path:
+        warc_path = lambda fn: os.path.abspath(fn)
+    elif options.file_prefix:
+        warc_path = lambda fn: os.path.join(file_prefix, fn)
+    else:
+        warc_path = None
+
+    def canonicalizer(url, options=dict(options.canonicalizer_options)):
+        return surt(url, **options)
+
+    exclude_list = options.exclude_list and PrefixExclusion(
+            options.exclude_list, canonicalizer)
+
     cdx_writer = CDX_Writer(input_files[0], input_files[1],
                             format=options.format,
-                            use_full_path   = options.use_full_path,
-                            file_prefix     = options.file_prefix,
-                            all_records     = options.all_records,
-                            screenshot_mode = options.screenshot_mode,
-                            exclude_list    = options.exclude_list,
-                            stats_file      = options.stats_file,
-                            canonicalizer_options =
-                            options.canonicalizer_options
+                            warc_path=warc_path,
+                            dispatch_mode=options.dispatch_mode,
+                            exclude_list=exclude_list,
+                            canonicalizer=canonicalizer
                            )
-    cdx_writer.make_cdx()
+    try:
+        cdx_writer.make_cdx()
+    finally:
+        if options.stats_file is not None:
+            with open(options.stats_file, 'w') as f:
+                json.dump(cdx_writer.stats, f, indent=4)
     return 0
 
 if __name__ == '__main__':
