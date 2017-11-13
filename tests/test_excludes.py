@@ -7,16 +7,19 @@ import json
 import os
 import subprocess
 
+import cdx_writer
 
 tests = [
     {
         'file': 'uncompressed.arc',
         'exclude': 'http://www.sueddeutsche.de',
-        'result' : """ CDX N b a m s k r M S V g
-filedesc://51_23_20110804181044_crawl101.arc.gz 20110804181044 filedesc://51_23_20110804181044_crawl101.arc.gz warc/filedesc - 3I42H3S6NNFQ2MSVX7XZKYAYSCX5QBYJ - - 161 0 uncompressed.arc
-vn,rolo,art)/a/chi-tiet/021826271565622/ngoc-trinh-xinh-tuoi-o-hoi-an 20110804181044 http://art.rolo.vn:80/a/chi-tiet/021826271565622/ngoc-trinh-xinh-tuoi-o-hoi-an unk 404 3I42H3S6NNFQ2MSVX7XZKYAYSCX5QBYJ - - 229 162 uncompressed.arc
-com,monsterindia,jobs)/details/9660976.html 20110804181044 http://jobs.monsterindia.com:80/details/9660976.html text/html 200 BQJDX42R5GFX4OIXPGNHZG3QFM5X3KQR - - 51406 79332 uncompressed.arc
-""",
+        'result' : (
+
+            b" CDX N b a m s k r M S V g\n"
+            b"filedesc://51_23_20110804181044_crawl101.arc.gz 20110804181044 filedesc://51_23_20110804181044_crawl101.arc.gz warc/filedesc - 3I42H3S6NNFQ2MSVX7XZKYAYSCX5QBYJ - - 161 0 uncompressed.arc\n"
+b"vn,rolo,art)/a/chi-tiet/021826271565622/ngoc-trinh-xinh-tuoi-o-hoi-an 20110804181044 http://art.rolo.vn:80/a/chi-tiet/021826271565622/ngoc-trinh-xinh-tuoi-o-hoi-an unk 404 3I42H3S6NNFQ2MSVX7XZKYAYSCX5QBYJ - - 229 162 uncompressed.arc\n"
+b"com,monsterindia,jobs)/details/9660976.html 20110804181044 http://jobs.monsterindia.com:80/details/9660976.html text/html 200 BQJDX42R5GFX4OIXPGNHZG3QFM5X3KQR - - 51406 79332 uncompressed.arc\n"
+),
         'num_filtered': 1,
     },
     {
@@ -42,7 +45,6 @@ com,monsterindia,jobs)/details/9660976.html 20110804181044 http://jobs.monsterin
 
 testdir = py.path.local(__file__).dirpath()
 datadir = testdir / "small_warcs"
-cdx_writer = str(testdir / "../cdx_writer.py")
 
 @pytest.mark.parametrize("test", tests)
 def test_exlcudes(test, tmpdir):
@@ -54,11 +56,13 @@ def test_exlcudes(test, tmpdir):
 
     exclude_list.write(test['exclude'] + '\n')
 
-    cmd = [cdx_writer, '--all-records', '--exclude-list='+str(exclude_list),
-           '--stats-file='+str(stats_file), str(test_file)]
+    cdxout = tmpdir / 'out.cdx'
+    args = ['--all-records', '--exclude-list='+str(exclude_list),
+            '--stats-file='+str(stats_file), str(test_file), str(cdxout)]
 
     with datadir.as_cwd():
-        output = subprocess.check_output(cmd)
+        cdx_writer.main(args)
+        output = cdxout.read_binary()
     #assert output.strip().endswith(test['result']), """\n  expected: %s\n       got: %s\n""" % (test['result'], '\n'.join(output.split('\n')[1:]))
     assert output == test['result']
 

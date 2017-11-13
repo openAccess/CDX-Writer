@@ -100,7 +100,7 @@ warcs_defaults = {
 
 testdir = py.path.local(__file__).dirpath()
 datadir = testdir / "small_warcs"
-sys.path[0:0] = (str(testdir / '..'),)
+#sys.path[0:0] = (str(testdir / '..'),)
 cdx_writer = __import__('cdx_writer')
 
 @pytest.mark.parametrize(["file", "expected"], warcs_all_records.iteritems())
@@ -139,4 +139,3 @@ def test_defaults(file, expected, tmpdir):
             sys.stdout = saved_stdout
     assert 0 == status
     assert output == expected
-

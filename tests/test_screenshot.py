@@ -8,7 +8,8 @@ import base64
 
 import io
 from gzip import GzipFile
-from cdx_writer import CDX_Writer
+import cdx_writer
+#from cdx_writer import CDX_Writer
 from hanzo.warctools import WarcRecord
 
 def create_metadata_record_bytes(
@@ -76,8 +77,8 @@ def test_sceenshot_regular(block_digest, tmpdir):
 
     cdxout = tmpdir / 'test.cdx'
     with tmpdir.as_cwd():
-        cdx_writer = CDX_Writer(warc.basename, cdxout.basename, dispatch_mode='screenshot')
-        cdx_writer.make_cdx()
+        args = ['--screenshot-mode', warc.basename, cdxout.basename]
+        cdx_writer.main(args)
 
     assert cdxout.isfile()
     cdx =  cdxout.readlines() # utf-8 decoded
