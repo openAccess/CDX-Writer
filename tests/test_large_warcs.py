@@ -17,8 +17,7 @@ warc_dir = data_dir
 
 warcs = [
     dict(fn='YTV-20120204025848-crawl442/YTV-20120204035110-15431.warc.gz',
-         file_md5='f06e02b7b777143c0eb67d9de45da8f4',
-         cdx_md5='7a891b642febb891a6cf78511dc80a55'
+         file_md5='f06e02b7b777143c0eb67d9de45da8f4'
          ),
     dict(fn='WIDE-20120121162724-crawl411/WIDE-20120121174231-03025.warc.gz',
          file_md5='f89b9b1b5f36d9c3039e2da2169e01d4'
@@ -31,12 +30,12 @@ warcs = [
          file_md5='8712de66615e4da87dfb524a5015e19f'
          ),
     dict(fn='ftp-mayn-de-2016-08-04/ftp.mayn.de.warc.gz',
-        file_md5='19699891d68508d2a1105a5a2f8f35e6'
-        )
+         file_md5='19699891d68508d2a1105a5a2f8f35e6'
+         )
     ]
 
 testdir = py.path.local(__file__).dirpath()
-cdx_writer = str(testdir / '../cdx_writer.py')
+cdx_writer = "cdx_writer"
 
 if sys.platform == 'darwin':
     TIMECMD = '/usr/bin/time -p '
@@ -58,8 +57,6 @@ def test_large_warcs(data, tmpdir):
     warc_file = os.path.join(warc_dir, warc_fn)
     if not os.path.isfile(warc_file):
         pytest.skip("requires {} to run this test".format(warc_file))
-
-    expected_cdx_md5 = data.get('cdx_md5')
 
     tmpcdx = tmpdir / 'tmp.cdx'
 
@@ -84,10 +81,6 @@ def test_large_warcs(data, tmpdir):
         status, output = commands.getstatusoutput(cmd)
         print output
         assert 0 == status
-
-    if expected_cdx_md5:
-        cdx_md5 = file_md5(tmpcdx)
-        assert expected_cdx_md5 == cdx_md5
 
 def run_cdx_writer(warc_file, output, basedir=None):
     if basedir:

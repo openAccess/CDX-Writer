@@ -1,10 +1,10 @@
-# cdx_writer.py
+# cdx_writer
 Python script to create CDX index files of WARC data.
 
 [![Build Status](https://travis-ci.org/internetarchive/CDX-Writer.png?branch=master)](https://travis-ci.org/internetarchive/CDX-Writer)
 
 ## Usage
-Usage: `cdx_writer.py [options] warc.gz`
+Usage: `cdx_writer [options] warc.gz [output.cdx]`
 
 Options:
 
@@ -21,8 +21,8 @@ Options:
     --exclude-list=EXCLUDE_LIST File containing url prefixes to exclude
     --stats-file=STATS_FILE     Output json file containing statistics
 
-
-Output is written to stdout. The first line of output is the CDX header.
+If `output.cdx` (second argument) is omitted,
+output is written to stdout. The first line of output is the CDX header.
 This header line begins with a space so that the cdx file can be passed
 through `sort` while keeping the header at the top.
 
@@ -50,39 +50,65 @@ http://www.archive.org/web/researcher/cdx_legend.php
 
 ## Installation
 
-Unfortunately, this script is not propery packaged and cannot be installed via pip. See the [.travis.yml](https://github.com/rajbot/CDX-Writer/blob/master/.travis.yml) file for hints on how to get it running.
+Version 0.4.0 changed the source code layout. `CDX_Writer` is now more like a regular Python library
+package. There no longer is `cdx_writer.py` script in the
+source tree; `cdx_writer` script will be created
+through package installation with `pip`.
 
+It is recommended to install this package into its own
+virtualenv, or create a PEX.
 
-## Differences between cdx_writer.py and archive-access cdx files
+Install into a vitualenv with`:
+
+```
+$ virtualenv /opt/cdx_writer
+$ /opt/cdx_writer/bin/pip install -r requirements.txt .
+```
+This will install Command line script `cdx_writer` into `/opt/cdx_writer/bin`.
+
+Create PEX with:
+```
+$ pex -r requirements.txt -o cdx_writer.pex -m cdx_writer .
+```
+Note that `setup.py` does not specify full dependencies because this package
+depends on non-published version of `warctools`. Please install dependencies
+through `requirements.txt`.
+
+## Differences from archive-access cdx files
+
 The CDX files produced by the [archive-access](http://sourceforge.net/projects/archive-access/)
-and that produced by cdx_writer.py differ in these cases:
+and that produced by `cdx_writer` differ in these cases:
 
-### Differences in SURTs:
+### SURT:
+
 * archive-access doesn't encode the %7F character in SURTs
 
-### Differences in MIME Type:
-* archive-access does not parse mime type for large warc payloads, and just returns 'unk'
-* If the HTTP Content-Type header is sent with a blank value, archive-access
-returns the value of the previous header as the mime type. cdx_writer.py
-returns 'unk' in this case. Example WARC Record (returns "close" as the mime type):
+### MIME Type:
+
+* archive-access does not parse mime type for large warc payloads, and just returns `unk`
+* If the HTTP `Content-Type` header is sent with a blank value, archive-access
+returns the value of the previous header as the mime type. cdx_writer
+returns `unk` in this case. Example WARC Record (returns `close` as the mime type):
     <code>...Content-Length: 0\r\nConnection: close\r\nContent-Type: \r\n\r\n\r\n\r\n</code>
 
-### Differences in Redirect urls:
-* archive-access does not escape whitespace, cdx_writer.py uses %20 escaping so we can split these files on whitespace.
-* archive-access removes unicode characters from redirect urls, cdx_writer.py version keeps them
-* archive-access does not decode html entities in redirect urls
+### Redirect URL:
+
+* archive-access does not escape whitespace, cdx_writer uses `%20` escaping so we can split these files on whitespace.
+* archive-access removes unicode characters from redirect URLs, cdx_writer version keeps them
+* archive-access does not decode HTML entities in redirect URLs
 * archive-access sometimes does not turn relative URLs into absolute urls
-* archive-access sometimes does not remove /../ from redirect urls
-* archive-access uses the value from the previous HTTP header for the redirect url if the location header is empty
-* cdx_writer.py only looks for http-equiv=refresh meta tag inside `HEAD` element
+* archive-access sometimes does not remove `/../` from redirect URLs
+* archive-access uses the value from the previous HTTP header for the redirect URL if the `Location` header is empty
+* cdx_writer only looks for `http-equiv=refresh` meta tag inside `HEAD` element
 
-### Differences in Meta Tags:
-* cdx_writer.py only looks for meta tags in the `HEAD` element
-* archive-access version doesn't parse multiple html meta tags, only the first one
-* archive-access misses FI meta tags sometimes
-* cdx_writer.py always returns tags in A, F, I order. archive-access does not use a consistent order
+### Meta Tag:
+
+* cdx_writer only looks for meta tags in the `HEAD` element
+* archive-access version doesn't parse multiple HTML meta tags, only the first one
+* archive-access misses `FI` meta tags sometimes
+* cdx_writer always returns tags in `A`, `F`, `I` order. archive-access does not use a consistent order
 
 
-### Differences in HTTP Response Codes
-* archive-access returns response code 0 if HTTP header line contains unicode:
+### HTTP Response Code:
+* archive-access returns response code `0` if HTTP header line contains non-ascii bytes:
     <code>HTTP/1.1 302 D\xe9plac\xe9 Temporairement\r\n...</code>
