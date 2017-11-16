@@ -16,8 +16,6 @@ Options:
                                 after processing it.
     --all-records               By default we only index http responses. Use this flag
                                 to index all WARC records in the file
-    --screenshot-mode           Special Wayback Machine mode for handling WARCs
-                                containing screenshots
     --exclude-list=EXCLUDE_LIST File containing url prefixes to exclude
     --stats-file=STATS_FILE     Output json file containing statistics
 

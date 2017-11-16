@@ -7,6 +7,7 @@ __all__ = [
 
 class RecordDispatcher(object):
     _cache = None
+
     def dispatch(self, record, offset, cdx_writer):
         record_type = record.type
         if self._cache is None:
@@ -26,46 +27,64 @@ class RecordDispatcher(object):
         return None
 
 class DefaultDispatcher(RecordDispatcher):
+    # handlers are resolved through these attributes so that sub-class can
+    # easily substitute handler classes.
+    response_handler = ResponseHandler
+    revisit_handler = RevisitHandler
+    ftp_handler = FtpHandler
+    resource_handler = ResourceHandler
+
+    def response_code(self, record):
+        """Return response status code from HTTP response line.
+        Only valid for ``response`` and (new style) ``revisit`` records.
+        Note return value is binary string, not int.
+        """
+        m = ResponseHandler.RE_RESPONSE_LINE.match(record.content[1])
+        return m and m.group(1)
+
     def dispatch_response(self, record):
         # probbaly it's better to test for "dns:" scheme?
         if record.content_type in ('text/dns',):
             return None
         # exclude 304 Not Modified responses (unless --all-records)
-        m = ResponseHandler.RE_RESPONSE_LINE.match(record.content[1])
-        if m and m.group(1) == '304':
+        if self.response_code(record) == '304':
             return None
-        return ResponseHandler
+        return self.response_handler
+
+    def is_server_not_modified(self, record):
+        warc_profile = record.get_header('WARC-Profile')
+        return warc_profile and warc_profile.endswith('/revisit/server-not-modified')
 
     def dispatch_revisit(self, record):
         # exclude 304 Not Modified revisits (unless --all-records)
-        if record.get_header('WARC-Profile') and record.get_header(
-                'WARC-Profile').endswith('/revisit/server-not-modified'):
+        if self.is_server_not_modified(record):
             return None
-        return RevisitHandler
+        return self.revisit_handler
 
     def dispatch_resource(self, record):
         # wget saves resource records with wget agument and logging
         # output at the end of the WARC. those need to be skipped.
         if record.url.startswith('ftp://'):
-            return FtpHandler
+            return self.ftp_handler
         elif record.url.startswith(('http://', 'https://')):
-            return ResourceHandler
+            return self.resource_handler
         return None
 
 class AllDispatcher(DefaultDispatcher):
+    warcinfo_handler = WarcinfoHandler
 
     def dispatch_response(self, record):
-        return ResponseHandler
+        return self.response_handler
 
     def dispatch_revisit(self, record):
-        return RevisitHandler
+        return self.revisit_handler
 
     def dispatch_resource(self, record):
         disp = super(AllDispatcher, self).dispatch_resource(record)
         return disp or RecordHandler
 
     def dispatch_warcinfo(self, record):
-        return WarcinfoHandler
+        return self.warcinfo_handler
 
     def dispatch_any(self, record):
         return RecordHandler

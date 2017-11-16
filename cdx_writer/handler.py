@@ -7,6 +7,11 @@ import hashlib
 import urlparse
 from datetime import datetime
 
+__all__ = [
+    'RecordHandler', 'WarcinfoHandler', 'ResponseHandler', 'RevisitHandler',
+    'FtpHandler',
+    'cachedproperty'
+]
 def to_unicode(s, charset):
     if isinstance(s, str):
         if charset is None:
@@ -18,6 +23,18 @@ def to_unicode(s, charset):
             except LookupError:
                 s = s.decode('utf-8', 'replace')
     return s
+
+def cachedproperty(func):
+    def get_or_call(self):
+        if '_propcache' not in self.__dict__:
+            self._propcache = {}
+        key = func.__name__
+        if key in self._propcache:
+            return self._propcache[key]
+        else:
+            value = self._propcache[key] = func(self)
+            return value
+    return property(get_or_call)
 
 # these function used to be used for normalizing URL for ``redirect`` field.
 def urljoin_and_normalize(base, url, charset):
@@ -253,7 +270,7 @@ class WarcinfoHandler(RecordHandler):
     @property
     def original_url(self):
         return 'warcinfo:/%s/%s' % (
-            self.cdx_writer.file, self.fake_build_version
+            self.cdx_writer.in_file, self.fake_build_version
             )
 
     @property
@@ -534,13 +551,6 @@ class ResponseHandler(HttpHandler):
 
         return ''.join(s) if s else None
 
-class ResourceHandler(RecordHandler):
-    """HTTP resource record (``resource`` record type).
-    """
-    @property
-    def mime_type(self):
-        return self.record.content[0]
-
 class RevisitHandler(HttpHandler):
     """HTTP revisit record (``revisit`` record type).
 
@@ -553,6 +563,13 @@ class RevisitHandler(HttpHandler):
         if digest is None:
             return None
         return digest.replace('sha1:', '')
+
+class ResourceHandler(RecordHandler):
+    """HTTP resource record (``resource`` record type).
+    """
+    @property
+    def mime_type(self):
+        return self.record.content[0]
 
 class FtpHandler(RecordHandler):
     @property

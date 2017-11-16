@@ -3,29 +3,72 @@ import os
 import json
 from operator import attrgetter
 from optparse import OptionParser
+from pkg_resources import iter_entry_points
 
 from hanzo.warctools import ArchiveRecord
 from surt import surt
 
 from .dispatcher import DefaultDispatcher, AllDispatcher
-from .screenshot import ScreenshotDispatcher
 from .exclusion import PrefixExclusion
 
-class CDX_Writer(object):
-    _mode_dispatcher = {
-        'default': DefaultDispatcher(),
-        'all': AllDispatcher(),
-
-        'screenshot': ScreenshotDispatcher()
+class Mode(object):
+    OPTIONS = {
+        'format': "N b a m s k r M S V g",
+        'use_full_path': False,
+        'file_prefix': None,
+        'dispatch_mode': 'default',
+        'exclude_list': None,
+        'canonicalizer_options': []
     }
 
-    def __init__(self, file, out_file=sys.stdout, format="N b a m s k r M S V g",
-                 warc_path=None, dispatch_mode=None,
+    def __init__(self, dispatcher=None, option_name=None, option_help=None, **params):
+        self.dispatcher = dispatcher or DefaultDispatcher()
+        self.option_name = option_name
+        self.option_help = option_help
+        self.options = dict(self.OPTIONS, **params)
+
+class CDXWriterConfig(object):
+    _modes = {
+        'all': Mode(dispatcher=AllDispatcher())
+    }
+    _fields = {
+        'M': 'AIF meta tags',
+        'N': 'massaged url',
+        'S': 'compressed record size',
+        'V': 'compressed arc file offset',
+        'a': 'original url',
+        'b': 'date',
+        'g': 'file name',
+        'k': 'new style checksum',
+        'm': 'mime type',
+        'r': 'redirect',
+        's': 'response code',
+    }
+
+    @classmethod
+    def define_mode(cls, name, dispatcher=None, option_name=None, option_help=None,
+                    format=None):
+        cls._modes[name] = Mode(dispatcher=dispatcher,
+                                option_name=option_name,
+                                option_help=option_help,
+                                format=format)
+
+    @classmethod
+    def set_option_default(cls, name, value):
+        cls._option_defaults[name] = value
+
+    @classmethod
+    def add_field(cls, label, name):
+        cls._fields[label] = name
+
+class CDX_Writer(object):
+    def __init__(self, config, mode, in_file,
+                 format="N b a m s k r M S V g",
+                 warc_path=None,
                  exclude_list=None, canonicalizer=None):
         """This class is instantiated for each web archive file and generates
         CDX from it.
 
-        :param file: input web archive file name
         :param out_file: file object to write CDX to
         :param format: CDX field specification string.
         :param warc_path: filename field value (literal or callable taking `file` as an argument)
@@ -33,28 +76,16 @@ class CDX_Writer(object):
         :param exclude_list: a file containing a list of excluded URLs
         :param canonicalizer_options: URL canonicalizer options
         """
-        self.field_map = {'M': 'AIF meta tags',
-                          'N': 'massaged url',
-                          'S': 'compressed record size',
-                          'V': 'compressed arc file offset',
-                          'a': 'original url',
-                          'b': 'date',
-                          'g': 'file name',
-                          'k': 'new style checksum',
-                          'm': 'mime type',
-                          'r': 'redirect',
-                          's': 'response code',
-                         }
+        self.config = config
+        self.in_file = in_file
 
-        self.file = file
-        self.out_file = out_file
+        self.field_map = config._fields
+
         self.format = format
 
         self.fieldgetter = self._build_fieldgetter(self.format.split())
 
-        self.dispatcher = self._mode_dispatcher[dispatch_mode or 'default']
-        # self.dispatcher = RecordDispatcher(
-        #     all_records=all_records, screenshot_mode=screenshot_mode)
+        self.dispatcher = mode.dispatcher
 
         self.urlkey = canonicalizer or surt
 
@@ -62,10 +93,7 @@ class CDX_Writer(object):
         #problematic file was 154MB, we'll stop at 5MB
         self.lxml_parse_limit = 5 * 1024 * 1024
 
-        if callable(warc_path):
-            self.warc_path = warc_path(file)
-        else:
-            self.warc_path = warc_path or file
+        self.warc_path = warc_path(in_file) if warc_path else in_file
 
         self.exclusion = exclude_list or False
 
@@ -90,23 +118,26 @@ class CDX_Writer(object):
     def should_exclude(self, urlkey):
         return self.exclusion and self.exclusion.excluded(urlkey)
 
-
-    def make_cdx(self):
+    def make_cdx(self, out_file):
+        """
+        :param in_file: input web archive file name
+        """
         self.stats = {
             'num_records_processed': 0,
             'num_records_included': 0,
             'num_records_filtered': 0,
         }
-        if hasattr(self.out_file, "write"):
-            self._make_cdx(self.out_file, self.stats)
+        if hasattr(out_file, "write"):
+            self._make_cdx(out_file, self.stats)
         else:
-            with open(self.out_file, "wb") as w:
+            with open(out_file, "wb") as w:
                 self._make_cdx(w, self.stats)
 
     def _make_cdx(self, out_file, stats):
+
         out_file.write(b' CDX ' + self.format + b'\n') #print header
 
-        fh = ArchiveRecord.open_archive(self.file, gzip="auto", mode="r")
+        fh = ArchiveRecord.open_archive(self.in_file, gzip="auto", mode="r")
         for (offset, record, errors) in fh.read_records(limit=None, offsets=True):
             if not record:
                 if errors:
@@ -143,29 +174,34 @@ class CDX_Writer(object):
 def main(args=None):
 
     parser = OptionParser(usage="%prog [options] warc.gz [output_file.cdx]")
-    parser.set_defaults(format        = "N b a m s k r M S V g",
-                        use_full_path = False,
-                        file_prefix   = None,
-                        all_records   = False,
-                        screenshot_mode = False,
-                        exclude_list    = None,
-                        canonicalizer_options = []
-                       )
 
     parser.add_option("--format",  dest="format", help="A space-separated list of fields [default: '%default']")
     parser.add_option("--use-full-path", dest="use_full_path", action="store_true", help="Use the full path of the warc file in the 'g' field")
     parser.add_option("--file-prefix",   dest="file_prefix", help="Path prefix for warc file name in the 'g' field."
                       " Useful if you are going to relocate the warc.gz file after processing it."
                      )
-    parser.add_option("--all-records", dest="dispatch_mode", action="store_const", const="all",
-                      help="By default we only index http responses. Use this flag to index all WARC records in the file")
-    parser.add_option("--screenshot-mode", dest="dispatch_mode", action="store_const", const="screenshot",
-                      help="Special Wayback Machine mode for handling WARCs containing screenshots")
+    parser.add_option("--all-records", dest="mode", action="store_const", const="all",
+                      help="By default cdx_writer only indexes http responses. "
+                      "Use this flag to index all WARC records in the file")
     parser.add_option("--exclude-list", dest="exclude_list", help="File containing url prefixes to exclude")
     parser.add_option("--stats-file", dest="stats_file", help="Output json file containing statistics")
     parser.add_option("--no-host-massage", dest="canonicalizer_options",
                       action='append_const', const=('host_massage', False),
                       help='Turn off host_massage (ex. stripping "www.")')
+
+    config = CDXWriterConfig
+
+    entry_points = iter_entry_points("CDX_Writer", "config")
+    for ep in entry_points:
+        ep.load()(config)
+
+    for mode_name, mode in config._modes.items():
+        if mode_name != 'default' and mode.option_name:
+            parser.add_option('--' + mode.option_name, action='store_const',
+                              const=mode_name, dest='mode',
+                              help=mode.option_help)
+    default_mode = config._modes.get('default') or Mode()
+    parser.set_defaults(**default_mode.options)
 
     if args is None:
         args = sys.argv[1:]
@@ -191,15 +227,16 @@ def main(args=None):
     exclude_list = options.exclude_list and PrefixExclusion(
             options.exclude_list, canonicalizer)
 
-    cdx_writer = CDX_Writer(input_files[0], input_files[1],
+    cdx_writer = CDX_Writer(config=config,
+                            mode=config._modes.get(options.mode, default_mode),
+                            in_file=input_files[0],
                             format=options.format,
                             warc_path=warc_path,
-                            dispatch_mode=options.dispatch_mode,
                             exclude_list=exclude_list,
                             canonicalizer=canonicalizer
                            )
     try:
-        cdx_writer.make_cdx()
+        cdx_writer.make_cdx(input_files[1])
     finally:
         if options.stats_file is not None:
             with open(options.stats_file, 'w') as f:
