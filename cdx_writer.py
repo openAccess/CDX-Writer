@@ -510,6 +510,10 @@ class ResponseHandler(HttpHandler):
             text_string = self.parsed_text.encode('utf-8', 'ignore')
         except:
             return None
+        term_threshold = 10
+        text_string = ' '.join(text_string.split())
+        if len(text_string.split()) < term_threshold:
+            return None
         is_reliable = None
         details = None
         lang_codes_with_pct = []
