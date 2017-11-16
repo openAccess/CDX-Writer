@@ -10,6 +10,7 @@ from surt import surt
 
 from .dispatcher import DefaultDispatcher, AllDispatcher
 from .exclusion import PrefixExclusion
+from .handler import RecordHandler
 
 class Mode(object):
     OPTIONS = {
@@ -60,6 +61,8 @@ class CDXWriterConfig(object):
     @classmethod
     def add_field(cls, label, name):
         cls._fields[label] = name
+        propname = name.replace(' ', '_').lower()
+        setattr(RecordHandler, propname, None)
 
 class CDX_Writer(object):
     def __init__(self, config, mode, in_file,
