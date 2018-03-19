@@ -127,11 +127,11 @@ class RecordHandler(object):
     def massaged_url(self):
         """massaged url / field "N".
         """
-        url = self.record.url
+        url = self.original_url
         try:
             return self.urlkey(url)
         except:
-            return self.original_url
+            return url
 
     @property
     def date(self):
