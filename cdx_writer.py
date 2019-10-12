@@ -584,6 +584,10 @@ class ScreenshotHandler(RecordHandler):
         return 'http://web.archive.org/screenshot/' + self.safe_url()
 
     @property
+    def massaged_url(self):
+        return 'org,archive,web)/screenshot/' + self.urlkey(self.safe_url())
+
+    @property
     def mime_type(self):
         return self.record.content[0]
 

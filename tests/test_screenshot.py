@@ -1,7 +1,6 @@
 from __future__ import unicode_literals
 import sys
 import py
-sys.path[0:0] = (str(py.path.local(__file__) / '../..'),)
 
 import pytest
 import hashlib
@@ -85,7 +84,8 @@ def test_sceenshot_regular(block_digest, tmpdir):
     assert len(cdx) == 2
     cdx1 = cdx[1].rstrip().split(' ')
     assert cdx1 == [
-        'com,example)/',
+        # surt collapses "//" to single slash.
+        'org,archive,web)/screenshot/com,example)/',
         '20160803104941',
         'http://web.archive.org/screenshot/http://example.com/',
         'image/png',
