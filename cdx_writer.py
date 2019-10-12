@@ -177,28 +177,15 @@ class RecordHandler(object):
         # There are few arc files from 2002 that have non-ascii characters in
         # the url field. These are not utf-8 characters, and the charset of the
         # page might not be specified, so use chardet to try and make these usable.
-        if isinstance(url, str):
-            try:
-                url.decode('ascii')
-            except UnicodeDecodeError:
-                enc = chardet.detect(url)
-                if enc and enc['encoding']:
-                    if 'EUC-TW' == enc['encoding']:
-                        # We don't have the EUC-TW encoding installed, and most likely
-                        # something is so wrong that we probably can't recover this url
-                        url = url.decode('Big5', 'replace')
-                    else:
-                        url = url.decode(enc['encoding'], 'replace')
-                else:
-                    url = url.decode('utf-8', 'replace')
+        if isinstance(url, bytes):
+            url = url.decode('latin1')
 
         # Some arc headers contain urls with the '\r' character, which will cause
         # problems downstream when trying to process this url, so escape it.
         # While we are at it, replace other newline chars.
-        url = url.replace('\r', '%0D')
-        url = url.replace('\n', '%0A')
-        url = url.replace('\x0c', '%0C') #formfeed
-        url = url.replace('\x00', '%00') #null may cause problems with downstream C programs
+        def percent_hex(m):
+            return "%{:02X}".format(ord(m.group(0)))
+        url = re.sub(r'[ \r\n\x0c\x08]', percent_hex, url)
 
         return url
 
@@ -207,7 +194,7 @@ class RecordHandler(object):
         """original url / field "a".
         """
         url = self.safe_url()
-        return url.encode('utf-8')
+        return url.encode('latin1')
 
     @property
     def mime_type(self):
@@ -278,7 +265,7 @@ class WarcinfoHandler(RecordHandler):
     def original_url(self):
         return 'warcinfo:/%s/%s' % (
             self.cdx_writer.file, self.fake_build_version
-            )
+        )
 
     @property
     def mime_type(self):
