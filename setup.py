@@ -7,4 +7,10 @@ setup(
     name='CDX-Writer',
     version='0.3.1',
     py_modules=['cdx_writer'],
-    )
+    etras_require={
+        'test': [
+            'pytest<5;python_version<"3"',
+            'pytest;python_version>="3"'
+        ]
+    }
+)
