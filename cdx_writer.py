@@ -129,7 +129,7 @@ class RecordHandler(object):
     def massaged_url(self):
         """massaged url / field "N".
         """
-        url = self.record.url
+        url = self.safe_url().encode('latin1')
         try:
             return self.urlkey(url)
         except:
@@ -180,9 +180,16 @@ class RecordHandler(object):
         if isinstance(url, bytes):
             url = url.decode('latin1')
 
+        # due to a descrepancy in WARC 1.0 specification, certain versions of
+        # wget put < > around WARC-Target-URI value.
+        if url[:1] == '<' and url[-1:] == '>':
+            url = url[1:-1]
+
         # Some arc headers contain urls with the '\r' character, which will cause
-        # problems downstream when trying to process this url, so escape it.
-        # While we are at it, replace other newline chars.
+        # problems downstream when trying to process this url, Browsers typially
+        # remove '\r'. So do we.
+        url = url.replace('\r', '')
+        # %-encode other white spaces that can cuase CDX parsing problems
         def percent_hex(m):
             return "%{:02X}".format(ord(m.group(0)))
         url = re.sub(r'[ \r\n\x0c\x08]', percent_hex, url)
