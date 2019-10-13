@@ -94,6 +94,7 @@ warcs_defaults = {
     'wget_ia.warc.gz': b' CDX N b a m s k r M S V g\norg,archive)/ 20140314173216 https://archive.org/ text/html 200 ZSSZNM66RWQWZ7FMNEP2XEAORAULQHMY - - 6891 414 wget_ia.warc.gz\n',
     'tweet.warc.gz': b' CDX N b a m s k r M S V g\ncom,twitter)/zionfather/status/849230566553788416 20170404120905 https://twitter.com/zionfather/status/849230566553788416 application/json - BE7OMHMDUH6CI5OJXBC4D5AOFFZETVN2 - - 1168 0 tweet.warc.gz\n',
     'empty-gzips.warc.gz': b' CDX N b a m s k r M S V g\ncom,example)/ 20171006165514 http://example.com/ text/html 200 B2LTWWPUOYAH7UIPQ7ZUPQ4VMBSVC36A - - 1109 626 empty-gzips.warc.gz\ncom,example)/ 20171006165521 http://example.com/ warc/revisit - B2LTWWPUOYAH7UIPQ7ZUPQ4VMBSVC36A - - 637 2782 empty-gzips.warc.gz\ncom,example)/ 20171006165527 http://example.com/ warc/revisit - B2LTWWPUOYAH7UIPQ7ZUPQ4VMBSVC36A - - 639 5031 empty-gzips.warc.gz\n',
+    'space_in_target_uri.warc.gz': b' CDX N b a m s k r M S V g\ncom,example)/weather/forecast/json/mclean%20va?ajax=true 20180625013519 https://www.example.com/weather/forecast/json/McLean%20VA/?ajax=true application/json 200 XFQPAJHSLBVGHHRSMGJ3OPHNQYYJH3QZ - - 398 0 space_in_target_uri.warc.gz\n'
 }
 
 testdir = py.path.local(__file__).dirpath()
