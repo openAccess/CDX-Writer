@@ -639,6 +639,10 @@ class RecordDispatcher(object):
         if record.content_type in ('text/dns',):
             return None
         if record.type == 'response':
+            # discard ARC records for failed liveweb proxy
+            ipaddr = record.get_header('IP-address')
+            if ipaddr == '0.0.0.0':
+                return False
             # exclude 304 Not Modified responses (unless --all-records)
             m = ResponseHandler.RE_RESPONSE_LINE.match(record.content[1])
             if m and m.group(1) == '304':
@@ -675,6 +679,8 @@ class RecordDispatcher(object):
     def get_handler(self, record, **kwargs):
         for disp in self.dispatchers:
             handler = disp(record)
+            if handler is False:
+                break
             if handler:
                 return handler(record, **kwargs)
         return None

@@ -5,7 +5,7 @@ from setuptools import setup
 
 setup(
     name='CDX-Writer',
-    version='0.3.2',
+    version='0.3.3',
     py_modules=['cdx_writer'],
     etras_require={
         'test': [
