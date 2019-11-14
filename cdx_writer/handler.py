@@ -252,7 +252,7 @@ class WarcinfoHandler(RecordHandler):
     @property
     def original_url(self):
         return 'warcinfo:/%s/%s' % (
-            self.cdx_writer.file, self.fake_build_version
+            self.cdx_writer.in_file, self.fake_build_version
         )
 
     @property
@@ -400,7 +400,7 @@ class ResponseHandler(HttpHandler):
         # For ARC record content_type returns response content type from
         # ARC header line.
         content_type = self.record.content_type
-        if content_type is None:
+        if not content_type:
             return 'unk'
 
         # Alexa arc files use 'no-type' instead of 'unk'

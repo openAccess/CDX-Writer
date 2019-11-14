@@ -10,6 +10,8 @@ from surt import surt
 from .dispatcher import DefaultDispatcher, AllDispatcher
 from .screenshot import ScreenshotDispatcher
 from .exclusion import PrefixExclusion
+from .handler import RecordHandler
+from .archive import ArchiveRecordReader
 
 class CDX_Writer(object):
     _mode_dispatcher = {
@@ -19,13 +21,13 @@ class CDX_Writer(object):
         'screenshot': ScreenshotDispatcher()
     }
 
-    def __init__(self, file, out_file=sys.stdout, format="N b a m s k r M S V g",
+    def __init__(self, in_file, out_file=sys.stdout, format="N b a m s k r M S V g",
                  warc_path=None, dispatch_mode=None,
                  exclude_list=None, canonicalizer=None):
         """This class is instantiated for each web archive file and generates
         CDX from it.
 
-        :param file: input web archive file name
+        :param in_file: input web archive file name
         :param out_file: file object to write CDX to
         :param format: CDX field specification string.
         :param warc_path: filename field value (literal or callable taking `file` as an argument)
@@ -46,7 +48,7 @@ class CDX_Writer(object):
                           's': 'response code',
                          }
 
-        self.file = file
+        self.in_file = in_file
         self.out_file = out_file
         self.format = format
 
@@ -63,9 +65,9 @@ class CDX_Writer(object):
         self.lxml_parse_limit = 5 * 1024 * 1024
 
         if callable(warc_path):
-            self.warc_path = warc_path(file)
+            self.warc_path = warc_path(in_file)
         else:
-            self.warc_path = warc_path or file
+            self.warc_path = warc_path or in_file
 
         self.exclusion = exclude_list or False
 
@@ -106,15 +108,10 @@ class CDX_Writer(object):
     def _make_cdx(self, out_file, stats):
         out_file.write(b' CDX ' + self.format + b'\n') #print header
 
-        fh = ArchiveRecord.open_archive(self.file, gzip="auto", mode="r")
-        for (offset, record, errors) in fh.read_records(limit=None, offsets=True):
-            if not record:
-                if errors:
-                    raise ParseError(str(errors))
-                continue # tail
-
+        record_reader = ArchiveRecordReader(self.in_file)
+        for record in record_reader:
             stats['num_records_processed'] += 1
-            handler = self.dispatcher.dispatch(record, offset, self)
+            handler = self.dispatcher.dispatch(record, record.offset, self)
             if not handler:
                 continue
 
@@ -138,7 +135,7 @@ class CDX_Writer(object):
             #record.dump()
             stats['num_records_included'] += 1
 
-        fh.close()
+        record_reader.close()
 
 def main(args=None):
 

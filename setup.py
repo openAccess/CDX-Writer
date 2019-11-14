@@ -9,8 +9,7 @@ setup(
     packages=find_packages(),
     extras_require={
         'test': [
-            'pytest<5;python_version<"3"',
-            'pytest;python_version>="3"'
+            'pytest<5'
         ]
     },
     entry_points={
