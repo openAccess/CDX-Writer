@@ -432,12 +432,13 @@ class ResponseHandler(HttpHandler):
             content_type = 'unk'
         return content_type
 
-    RE_RESPONSE_LINE = re.compile(r'HTTP(?:/\d\.\d)? (\d+)')
+    RE_RESPONSE_LINE = re.compile(
+        r'HTTP(?P<version>/\d\.\d)? (?P<statuscode>\d+)')
 
     @property
     def response_code(self):
         m = self.RE_RESPONSE_LINE.match(self.record.content[1])
-        return m and m.group(1)
+        return m and m.group('statuscode')
 
     @property
     def new_style_checksum(self):
@@ -639,14 +640,19 @@ class RecordDispatcher(object):
         if record.content_type in ('text/dns',):
             return None
         if record.type == 'response':
+            # exclude 304 Not Modified responses (unless --all-records)
+            m = ResponseHandler.RE_RESPONSE_LINE.match(record.content[1])
+            if m and m.group('statuscode') == '304':
+                return None
             # discard ARC records for failed liveweb proxy
             ipaddr = record.get_header('IP-address')
             if ipaddr == '0.0.0.0':
-                return False
-            # exclude 304 Not Modified responses (unless --all-records)
-            m = ResponseHandler.RE_RESPONSE_LINE.match(record.content[1])
-            if m and m.group(1) == '304':
-                return None
+                # some ARcs have valid captures with IP-Address=0.0.0.0
+                # we need to check further; no HTTP version and 50{2,4}
+                # status.
+                if (m and m.group('version') is None and
+                    m.group('statuscode') in ('502', '504')):
+                    return False
             return ResponseHandler
         elif record.type == 'revisit':
             # exclude 304 Not Modified revisits (unless --all-records)
