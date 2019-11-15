@@ -129,7 +129,7 @@ class RecordHandler(object):
     def massaged_url(self):
         """massaged url / field "N".
         """
-        url = self.record.url
+        url = self.safe_url().encode('latin1')
         try:
             return self.urlkey(url)
         except:
@@ -177,28 +177,22 @@ class RecordHandler(object):
         # There are few arc files from 2002 that have non-ascii characters in
         # the url field. These are not utf-8 characters, and the charset of the
         # page might not be specified, so use chardet to try and make these usable.
-        if isinstance(url, str):
-            try:
-                url.decode('ascii')
-            except UnicodeDecodeError:
-                enc = chardet.detect(url)
-                if enc and enc['encoding']:
-                    if 'EUC-TW' == enc['encoding']:
-                        # We don't have the EUC-TW encoding installed, and most likely
-                        # something is so wrong that we probably can't recover this url
-                        url = url.decode('Big5', 'replace')
-                    else:
-                        url = url.decode(enc['encoding'], 'replace')
-                else:
-                    url = url.decode('utf-8', 'replace')
+        if isinstance(url, bytes):
+            url = url.decode('latin1')
+
+        # due to a descrepancy in WARC 1.0 specification, certain versions of
+        # wget put < > around WARC-Target-URI value.
+        if url[:1] == '<' and url[-1:] == '>':
+            url = url[1:-1]
 
         # Some arc headers contain urls with the '\r' character, which will cause
-        # problems downstream when trying to process this url, so escape it.
-        # While we are at it, replace other newline chars.
-        url = url.replace('\r', '%0D')
-        url = url.replace('\n', '%0A')
-        url = url.replace('\x0c', '%0C') #formfeed
-        url = url.replace('\x00', '%00') #null may cause problems with downstream C programs
+        # problems downstream when trying to process this url, Browsers typially
+        # remove '\r'. So do we.
+        url = url.replace('\r', '')
+        # %-encode other white spaces that can cuase CDX parsing problems
+        def percent_hex(m):
+            return "%{:02X}".format(ord(m.group(0)))
+        url = re.sub(r'[ \r\n\x0c\x08]', percent_hex, url)
 
         return url
 
@@ -207,7 +201,7 @@ class RecordHandler(object):
         """original url / field "a".
         """
         url = self.safe_url()
-        return url.encode('utf-8')
+        return url.encode('latin1')
 
     @property
     def mime_type(self):
@@ -278,7 +272,7 @@ class WarcinfoHandler(RecordHandler):
     def original_url(self):
         return 'warcinfo:/%s/%s' % (
             self.cdx_writer.file, self.fake_build_version
-            )
+        )
 
     @property
     def mime_type(self):
@@ -438,12 +432,13 @@ class ResponseHandler(HttpHandler):
             content_type = 'unk'
         return content_type
 
-    RE_RESPONSE_LINE = re.compile(r'HTTP(?:/\d\.\d)? (\d+)')
+    RE_RESPONSE_LINE = re.compile(
+        r'HTTP(?P<version>/\d\.\d)? (?P<statuscode>\d+)')
 
     @property
     def response_code(self):
         m = self.RE_RESPONSE_LINE.match(self.record.content[1])
-        return m and m.group(1)
+        return m and m.group('statuscode')
 
     @property
     def new_style_checksum(self):
@@ -584,6 +579,10 @@ class ScreenshotHandler(RecordHandler):
         return 'http://web.archive.org/screenshot/' + self.safe_url()
 
     @property
+    def massaged_url(self):
+        return 'org,archive,web)/screenshot/' + self.urlkey(self.safe_url())
+
+    @property
     def mime_type(self):
         return self.record.content[0]
 
@@ -643,8 +642,17 @@ class RecordDispatcher(object):
         if record.type == 'response':
             # exclude 304 Not Modified responses (unless --all-records)
             m = ResponseHandler.RE_RESPONSE_LINE.match(record.content[1])
-            if m and m.group(1) == '304':
+            if m and m.group('statuscode') == '304':
                 return None
+            # discard ARC records for failed liveweb proxy
+            ipaddr = record.get_header('IP-address')
+            if ipaddr == '0.0.0.0':
+                # some ARcs have valid captures with IP-Address=0.0.0.0
+                # we need to check further; no HTTP version and 50{2,4}
+                # status.
+                if (m and m.group('version') is None and
+                    m.group('statuscode') in ('502', '504')):
+                    return False
             return ResponseHandler
         elif record.type == 'revisit':
             # exclude 304 Not Modified revisits (unless --all-records)
@@ -677,6 +685,8 @@ class RecordDispatcher(object):
     def get_handler(self, record, **kwargs):
         for disp in self.dispatchers:
             handler = disp(record)
+            if handler is False:
+                break
             if handler:
                 return handler(record, **kwargs)
         return None
