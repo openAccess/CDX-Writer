@@ -192,6 +192,18 @@ class PatchedGzipRecordStream(GzipRecordStream):
         offset = self.fh.member_offset
         return offset, record, errors
 
+    def read_records(self, limit=1, offsets=True):
+        # overridden to support empty gzip member
+        nrecords = 0
+        prev_offset = None
+        while limit is None or nrecords < limit:
+            offset, record, errors = self._read_record(offsets)
+            nrecords += 1
+            yield offset, record, errors
+            if not record and prev_offset is not None and prev_offset == offset:
+                break
+            prev_offset = offset
+
 hanzo.warctools.stream.GzipRecordStream = PatchedGzipRecordStream
 
 from hanzo.warctools.archive_detect import register_record_type
