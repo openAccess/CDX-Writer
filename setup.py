@@ -7,6 +7,10 @@ setup(
     name='CDX-Writer',
     version='0.4.0',
     packages=find_packages(),
+    install_requires=[
+        'warctools>=4.10.0',
+        'surt==0.3.1'
+    ],
     extras_require={
         'test': [
             'pytest<5'

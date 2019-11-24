@@ -111,12 +111,14 @@ class CDX_Writer(object):
         record_reader = ArchiveRecordReader(self.in_file)
         for record in record_reader:
             stats['num_records_processed'] += 1
-            handler = self.dispatcher.dispatch(record, record.offset, self)
+            handler = self.dispatcher.dispatch(record, self)
             if not handler:
                 continue
+            assert isinstance(handler, RecordHandler)
 
             ### arc files from the live web proxy can have a negative content length and a missing payload
             ### check the content_length from the arc header, not the computed payload size returned by record.content_length
+            # XXX move this to dispatcher.
             content_length_str = record.get_header(record.CONTENT_LENGTH)
             if content_length_str is not None and int(content_length_str) < 0:
                 continue

@@ -1,11 +1,172 @@
 import os
 import re
 import sys
+import io
 import base64
-import chardet
 import hashlib
 import urlparse
 from datetime import datetime
+import six
+
+class RecordStreamReader(io.RawIOBase):
+    def __init__(self, stream):
+        """This class serves two purposes:
+
+        1. shields underlining `stream` (RecordStream) from cascading close() calls.
+        2. makes `stream` io.IOBase compatible. in particular, defines `readable`,
+           `readinto`, and `readlines` (CDX-Writer does not use it, but `HTTPResponse`
+           assumes defined)
+
+        (probably record._content_file should be wrapped by something like this
+        at warctools level)
+        """
+        self.stream = stream
+
+    # this is the same as the default implementation, but this is the key.
+    # def close(self):
+    #     pass
+
+    def readable(self):
+        return True
+
+    def readinto(self, b):
+        return self.stream.readinto(b)
+
+class DigestingReader(io.RawIOBase):
+    def __init__(self, stream):
+        """DigstingReader transparently reads from `stream`, computing
+        digest hash as data go through it.
+        `complete` flag is set when it sees EOF.
+        """
+        self.stream = stream
+        self.digester = hashlib.sha1()
+        self.complete = False
+
+    def b32digest(self):
+        # returns bytes
+        return base64.b32encode(self.digester.digest())
+
+    def readable(self):
+        return True
+
+    def readinto(self, b):
+        n = self.stream.readinto(b)
+        if n > 0:
+            self.digester.update(b[:n])
+        else:
+            self.complete = True
+        return n
+
+from six.moves.http_client import HTTPResponse, BadStatusLine, UnknownProtocol
+if issubclass(HTTPResponse, object):
+    HTTPResponseParserBase = HTTPResponse
+else:
+    # Python 2 HTTPResponse is an old class. We need a new-style base class
+    HTTPResponseParserBase = type('HTTPResponseParserBase', (object, HTTPResponse), {})
+
+# raise header count limit
+six.moves.http_client._MAXHEADERS = 1000
+
+class HTTPResponseParser(HTTPResponseParserBase):
+    def __init__(self, fileobj):
+        if not hasattr(fileobj, 'peek'):
+            fileobj = io.BufferedReader(fileobj)
+        self.fileobj = fileobj
+        HTTPResponse.__init__(self, self, strict=0, buffering=False)
+        self.begin()
+
+    def makefile(self, a, b=None):
+        """makes HTTPResponseParser look like a socket to HTTPResponse."""
+        return self.fileobj
+
+    def _read_status(self):
+        """Overridden to handle truncated response and old-style revisits."""
+        try:
+            return super(HTTPResponseParser, self)._read_status()
+        except BadStatusLine as ex:
+            # no response from server, even a status line. old-style revisit
+            # record looks like this.
+            return 'HTTP/0.9', 200, ""
+
+    # io.RawIOBase compatibility (necessary for handling calls from DigestingReader)
+    def readinto(self, b):
+        # HTTPResponse does not implement readinto. implement
+        # with read()
+        size = len(b)
+        if size == 0:
+            return 0
+        d = self.read(size)
+        if not d:
+            return 0
+        b[:len(d)] = d
+        return len(d)
+
+    # chunked attribute is replaced with chunked property so that HTTPResponseParserr
+    # can parse with "Transfer-Encoding:chunked" and non-chunked-encoded content.
+    # we know there are captures with one space after hex chunk size. allowing multiple of
+    # space and TABs just in case.
+    RE_CHUNK_HEADER = re.compile(br'[0-9a-f]+[ \t]*\r\n', re.I)
+    def _get_chunked(self): # getter
+        return self._chunked
+    def _set_chunked(self, chunked):
+        # assumes self.fileobj is positioned at the start of response body when
+        # HTTPResponse assigns 1 to self.chunked
+        if chunked == 1:
+            probably_chunk_header = self.fileobj.peek(16)
+            if not self.RE_CHUNK_HEADER.match(probably_chunk_header):
+                # does not look like chunked-encoded. clear chunked flag.
+                chunked = 0
+                # debugging aid
+                self.transfer_encoding_ignored_because = probably_chunk_header[:16]
+        self._chunked = chunked
+    chunked = property(_get_chunked, _set_chunked)
+
+class RecordContent(object):
+    def __init__(self, stream):
+        """Object for accessing archive record content ("block" or "payload).
+        Provides content SHA1.
+
+        :param stream: file-like object for reading raw block content. must be positioned
+            at the start of block content (i.e. just after record header)
+        """
+        assert stream is not None
+        self._block_reader = stream
+        self.content_reader = self._setup_content_reader()
+
+    def _setup_content_reader(self):
+        return DigestingReader(self._block_reader)
+
+    def content_digest(self):
+        if not self.content_reader.complete:
+            while True:
+                d = self.content_reader.read(4096)
+                if not d:
+                    break
+        assert self.content_reader.complete
+        return self.content_reader.b32digest()
+
+class HttpResponseRecordContent(RecordContent):
+    """:class:`RecordContent` for accessing HTTP response content.
+    `content_reader` and `content_digest` works for HTTP response content, not record block.
+    """
+    def _setup_content_reader(self):
+        self._http_response = HTTPResponseParser(self._block_reader)
+        return DigestingReader(self._http_response)
+
+    def response_code(self):
+        return self._http_response.status
+
+    def get_http_header(self, name):
+        return self._http_response.getheader(name)
+
+    def content_type(self):
+        ct = self.get_http_header('content-type')
+        return ct
+
+    def http_version(self):
+        # int: 9, 10, or 11
+        return self._http_response.version
+
 
 def to_unicode(s, charset):
     if isinstance(s, str):
@@ -92,19 +253,34 @@ def urljoin_and_normalize(base, url, charset):
 class ParseError(Exception):
     pass
 
+class NoCloseBufferedReader(io.BufferedReader):
+    """BufferedReader that does not propagate close to underlining stream.
+    """
+    def close(self):
+        pass
+
 class RecordHandler(object):
-    def __init__(self, record, offset, cdx_writer):
+    _content = None
+    _content_factory = RecordContent
+
+    def __init__(self, record, env):
         """Defines default behavior for all fields.
         Field values are defined as properties with name
         matching descriptive name in ``field_map``.
         """
         self.record = record
-        self.offset = offset
-        self.cdx_writer = cdx_writer
-        self.urlkey = cdx_writer.urlkey
+        self.env = env
+        self.urlkey = env.urlkey
 
     def get_record_header(self, name):
         return self.record.get_header(name)
+
+    @property
+    def content(self):
+        if self._content is None:
+            reader = RecordStreamReader(self.record.content_file)
+            self._content = self._content_factory(reader)
+        return self._content
 
     @property
     def massaged_url(self):
@@ -184,6 +360,32 @@ class RecordHandler(object):
         url = self.safe_url()
         return url.encode('latin1')
 
+    def _normalize_content_type(self, content_type):
+        if content_type is None:
+            return 'unk'
+
+        # if multiple header fields with the same name occur, HTTPResponse
+        # joins values with comma, in reverse order of occurrence (this is prescribed by
+        # RFC 2616)
+        content_type = content_type.split(',', 1)[0]
+
+        # some http responses end abruptly: ...Content-Length: 0\r\nConnection: close\r\nContent-Type: \r\n\r\n\r\n\r\n'
+        content_type = content_type.strip()
+        if content_type == '':
+            return 'unk'
+        # Alexa arc files use 'no-type' instead of 'unk'
+        if content_type == 'no-type':
+            return 'unk'
+
+        m = re.match(r'(.+?);', content_type)
+        if m:
+            content_type = m.group(1)
+
+        if re.match(r'[-a-z0-9.+/]+$', content_type):
+            return content_type
+        else:
+            return 'unk'
+
     @property
     def mime_type(self):
         """mime type / field "m".
@@ -200,8 +402,7 @@ class RecordHandler(object):
     def new_style_checksum(self):
         """new style checksum / field "k".
         """
-        h = hashlib.sha1(self.record.content[1])
-        return base64.b32encode(h.digest())
+        return self.content.content_digest()
 
     @property
     def redirect(self):
@@ -223,8 +424,7 @@ class RecordHandler(object):
     def compressed_arc_file_offset(self):
         """compressed arc file offset / field "V".
         """
-        # TODO: offset attribute
-        return str(self.offset)
+        return str(self.record.offset)
 
     @property
     def aif_meta_tags(self):
@@ -238,7 +438,7 @@ class RecordHandler(object):
     def file_name(self):
         """file name / field "g".
         """
-        return self.cdx_writer.warc_path
+        return self.env.warc_path
 
 class WarcinfoHandler(RecordHandler):
     """``wercinfo`` record handler."""
@@ -252,7 +452,7 @@ class WarcinfoHandler(RecordHandler):
     @property
     def original_url(self):
         return 'warcinfo:/%s/%s' % (
-            self.cdx_writer.in_file, self.fake_build_version
+            self.env.in_file, self.fake_build_version
         )
 
     @property
@@ -302,142 +502,41 @@ class HttpHandler(RecordHandler):
         #
         # return '-'
 
-    def parse_charset(self):
-        charset = None
-
-        content_type = self.parse_http_header('content-type')
-        if content_type:
-            m = self.charset_pattern.search(content_type)
-            if m:
-                charset = m.group(1)
-
-        if charset is None and self.meta_tags is not None:
-            content_type = self.meta_tags.get('content-type')
-            if content_type:
-                m = self.charset_pattern.search(content_type)
-                if m:
-                    charset = m.group(1)
-
-        if charset:
-            charset = charset.replace('win-', 'windows-')
-
-        return charset
-
 class ResponseHandler(HttpHandler):
     """Handler for HTTP response with archived content (``response`` record type).
     """
-    def __init__(self, record, offset, cdx_writer):
-        super(ResponseHandler, self).__init__(record, offset, cdx_writer)
-        self.lxml_parse_limit = cdx_writer.lxml_parse_limit
-        self.headers, self.content = self.parse_headers_and_content()
+    _content_factory = HttpResponseRecordContent
+
+    def __init__(self, record, env):
+        super(ResponseHandler, self).__init__(record, env)
         self.meta_tags = self.parse_meta_tags()
 
-    response_pattern = re.compile('application/http;\s*msgtype=response$', re.I)
-
-    def parse_http_header(self, header_name):
-        if self.headers is None:
-            return None
-
-        pattern = re.compile(header_name+':\s*(.+)', re.I)
-        for line in iter(self.headers):
-            m = pattern.match(line)
-            if m:
-                return m.group(1)
-        return None
-
-    def parse_http_content_type_header(self):
-        content_type = self.parse_http_header('content-type')
-        if content_type is None:
-            return 'unk'
-
-        # some http responses end abruptly: ...Content-Length: 0\r\nConnection: close\r\nContent-Type: \r\n\r\n\r\n\r\n'
-        content_type = content_type.strip()
-        if '' == content_type:
-            return 'unk'
-
-        m = re.match('(.+?);', content_type)
-        if m:
-            content_type = m.group(1)
-
-        if re.match('[a-z0-9\-\.\+/]+$', content_type):
-            return content_type
-        else:
-            return 'unk'
-
-    charset_pattern = re.compile('charset\s*=\s*([a-z0-9_\-]+)', re.I)
-
-    crlf_pattern = re.compile('\r?\n\r?\n')
-
-    def parse_headers_and_content(self):
-        """Returns a list of header lines, split with splitlines(), and the content.
-        We call splitlines() here so we only split once, and so \r\n and \n are
-        split in the same way.
-        """
-        if self.record.content[1].startswith('HTTP'):
-            # some records with empty HTTP payload end with just one CRLF or
-            # LF. If split fails, we assume this situation, and let content be
-            # an empty bytes, rather than None, so that payload digest is
-            # emitted correctly (see get_new_style_checksum method).
-            try:
-                headers, content = self.crlf_pattern.split(self.record.content[1], 1)
-            except ValueError:
-                headers = self.record.content[1]
-                content = ''
-            return headers.splitlines(), content
-        else:
-            return None, None
-
     def is_response(self):
-        content_type = self.record.content_type
-        return content_type and self.response_pattern.match(content_type)
+        return self.record.is_response()
 
     @property
     def mime_type(self):
         if self.is_response():
-            # WARC
-            return self.parse_http_content_type_header()
-
-        # For ARC record content_type returns response content type from
-        # ARC header line.
-        content_type = self.record.content_type
-        if not content_type:
-            return 'unk'
-
-        # Alexa arc files use 'no-type' instead of 'unk'
-        if content_type == 'no-type':
-            return 'unk'
-        # if content_type contains non-ascii chars, return 'unk'
-        try:
-            content_type.decode('ascii')
-        except (LookupError, UnicodeDecodeError):
-            content_type = 'unk'
-        return content_type
+            content_type = self.content.content_type()
+        else:
+            # For ARC record content_type returns response content type from
+            # ARC header line.
+            # XXX - this is often wrong. We ought to look at HTTP response
+            # header if ARC header value is suspicious.
+            content_type = self.record.content_type
+        return self._normalize_content_type(content_type)
 
     RE_RESPONSE_LINE = re.compile(
         r'HTTP(?P<version>/\d\.\d)? (?P<statuscode>\d+)')
 
     @property
     def response_code(self):
-        m = self.RE_RESPONSE_LINE.match(self.record.content[1])
-        return m and m.group('statuscode')
+        code = self.content.response_code()
+        return code and format(code)
 
     @property
     def new_style_checksum(self):
-        if self.is_response():
-            digest = self.get_record_header('WARC-Payload-Digest')
-            return digest.replace('sha1:', '')
-        elif self.content is not None:
-            # This is an arc record. Our patched warctools fabricates the WARC-Payload-Digest
-            # header even for arc files so that we don't need to load large payloads in memory
-            digest = self.get_record_header('WARC-Payload-Digest')
-            if digest is not None:
-                return digest.replace('sha1:', '')
-            else:
-                h = hashlib.sha1(self.content)
-                return base64.b32encode(h.digest())
-        else:
-            h = hashlib.sha1(self.record.content[1])
-            return base64.b32encode(h.digest())
+        return self.content.content_digest()
 
     def parse_meta_tags(self):
         """We want to parse meta tags in <head>, even if not direct children.
@@ -458,12 +557,13 @@ class ResponseHandler(HttpHandler):
         meta_tags = {}
 
         #lxml.html can't parse blank documents
-        html_str = self.content.strip()
+        # XXX reading entire content into memory for now
+        html_str = self.content.content_reader.read()
         if '' == html_str:
             return meta_tags
 
         #lxml can't handle large documents
-        if self.record.content_length > self.lxml_parse_limit:
+        if self.record.content_length > self.env.lxml_parse_limit:
             return meta_tags
 
         # lxml was working great with ubuntu 10.04 / python 2.6
@@ -501,7 +601,7 @@ class ResponseHandler(HttpHandler):
 
     @property
     def aif_meta_tags(self):
-        x_robots_tag = self.parse_http_header('x-robots-tag')
+        x_robots_tag = self.content.get_http_header('x-robots-tag')
 
         robot_tags = []
         if self.meta_tags and 'robots' in self.meta_tags:
@@ -539,7 +639,7 @@ class ResourceHandler(RecordHandler):
     """
     @property
     def mime_type(self):
-        return self.record.content[0]
+        return self._normalize_content_type(self.record.content_type)
 
 class RevisitHandler(HttpHandler):
     """HTTP revisit record (``revisit`` record type).
@@ -557,7 +657,7 @@ class RevisitHandler(HttpHandler):
 class FtpHandler(RecordHandler):
     @property
     def mime_type(self):
-        return self.record.content[0]
+        return self._normalize_content_type(self.record.content_type)
 
     @property
     def response_code(self):
@@ -582,5 +682,4 @@ class FtpHandler(RecordHandler):
         if digest:
             return digest.replace('sha1:', '')
 
-        h = hashlib.sha1(self.record.content[1])
-        return base64.b32encode(h.digest())
+        return self.content.content_digest()

@@ -168,6 +168,11 @@ class PatchedGeeZipFile(GeeZipFile):
         GeeZipFile._add_read_data(self, data)
         assert self.offset - self.extrastart + self.extrasize == len(self.extrabuf)
 
+    def close(self):
+        # debugging
+        import traceback
+
+
 #__import__('hanzo').warctools.stream.GeeZipFile = PatchedGeeZipFile
 
 class PatchedGzipRecordStream(GzipRecordStream):
@@ -204,6 +209,7 @@ class PatchedGzipRecordStream(GzipRecordStream):
                 break
             prev_offset = offset
 
+
 hanzo.warctools.stream.GzipRecordStream = PatchedGzipRecordStream
 
 from hanzo.warctools.archive_detect import register_record_type
@@ -220,6 +226,8 @@ class ArchiveRecordEx(object):
         self._reader = reader
         self.offset = offset
         self.wrapped_record = record
+
+    RE_RESPONSE_CONTENT_TYPE = re.compile('application/http;\s*msgtype=response$', re.I)
 
     @property
     def compressed_record_size(self):
@@ -238,6 +246,14 @@ class ArchiveRecordEx(object):
         return end_offset - self.offset
         #return self._reader._next_offset() - self.offset
 
+    def is_response(self):
+        """Return ``True`` if this record is WARC ``response`` record
+        (i.e. currently returns ``False`` for ARC response records).
+        It is determined by ``Content-Type`` in WARC header, not ``WARC-Type``.
+        """
+        content_type = self.content_type
+        return content_type and self.RE_RESPONSE_CONTENT_TYPE.match(content_type)
+
     # following methods makes ArchiveRecordEx compatible with ArchiveRecord
     @property
     def type(self):
@@ -253,14 +269,27 @@ class ArchiveRecordEx(object):
 
     @property
     def content(self):
-        return self.wrapped_record.content
+        # ArchiveRecord.content shall not be used because it breaks RecordHandler's
+        # reading content_file, and loads entire record content into memory.
+        raise Exception('content shall not be used')
+        #return self.wrapped_record.content
+
+    @property
+    def content_file(self):
+        return self.wrapped_record.content_file
 
     @property
     def content_type(self):
-        return self.wrapped_record.content_type
+        # we cannot use ArchiveRecord.content_type because it accesses its content[0]
+        # (i.e. it invalidates content_file)
+        #return self.wrapped_record.content_type
+        # this returns record-level content-type.
+        return self.get_header(self.wrapped_record.CONTENT_TYPE)
 
     @property
     def content_length(self):
+        # XXX ArchiveRecord.content_length resorts to content[1] if Content-Length
+        # header does not exist.
         return self.wrapped_record.content_length
 
     def get_header(self, name):
