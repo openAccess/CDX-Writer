@@ -8,3 +8,6 @@ tests/large_warcs/*/*.warc.gz
 tests/large_warcs/*/*.arc.gz
 *.pyc
 .cache/
+.pytest_cache/
+/.vscode
+/.python-version
