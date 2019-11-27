@@ -169,7 +169,7 @@ class RecordHandler(object):
             return record.date[:14]
 
         #warc record
-        date = datetime.strptime(record.date, "%Y-%m-%dT%H:%M:%SZ")
+        date = datetime.strptime(record.date, "%Y-%m-%dT%H:%M:%S.%fZ")
         return date.strftime("%Y%m%d%H%M%S")
 
     def safe_url(self):
