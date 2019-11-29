@@ -557,8 +557,8 @@ class ResponseHandler(HttpHandler):
         meta_tags = {}
 
         #lxml.html can't parse blank documents
-        # XXX reading entire content into memory for now
-        html_str = self.content.content_reader.read()
+        # reading max 5MB into memory
+        html_str = self.content.content_reader.read(5 * 1024 * 1024)
         if '' == html_str:
             return meta_tags
 
