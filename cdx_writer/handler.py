@@ -6,6 +6,7 @@ import base64
 import hashlib
 import urlparse
 from datetime import datetime
+from httplib import IncompleteRead
 import six
 
 class RecordStreamReader(io.RawIOBase):
@@ -95,7 +96,12 @@ class HTTPResponseParser(HTTPResponseParserBase):
         size = len(b)
         if size == 0:
             return 0
-        d = self.read(size)
+        # silently catches IncompleteRead due to truncated chunk encoding,
+        # and returns whatever available so far.
+        try:
+            d = self.read(size)
+        except IncompleteRead as ex:
+            d = ex.partial
         if not d:
             return 0
         b[:len(d)] = d

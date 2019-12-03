@@ -339,6 +339,10 @@ warcs_defaults = {
     ],
     'bracket_in_target_uri.warc.gz': [
         b'com,example)/data.json 20180625013519 https://www.example.com/data.json application/json 200 L43LF2RJAZC64NGZIMRAUFFVJ3S6UW7F - - 328 0 bracket_in_target_uri.warc.gz'
+    ],
+    # chunk-encoded, missing the last "0".
+    'missing_chunk_end.warc.gz': [
+        b'com,example)/robots.txt 20180803220238 https://example.com/robots.txt text/html 200 W6PEP6F76ZFMLBSNK575R7TWG5STXYBO - - 2406 0 missing_chunk_end.warc.gz'
     ]
 }
 
