@@ -217,7 +217,7 @@ from hanzo.warctools.archive_detect import register_record_type
 # some ARC files are missing the filedesc record at the beginning
 register_record_type(
     # pattern for ARC v1 header
-    re.compile('^https?://\S+ (?:\d{1,3}\.){3}\d{1,3} \d{14} \S+ \d+$'),
+    re.compile('^https?://\S+ (?:\d{1,3}\.){3}\d{1,3} \d{14} \S* \d+$'),
     ArcRecord
 )
 
