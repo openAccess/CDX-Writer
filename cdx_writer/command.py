@@ -180,7 +180,7 @@ def main(args=None):
     if options.use_full_path:
         warc_path = lambda fn: os.path.abspath(fn)
     elif options.file_prefix:
-        warc_path = lambda fn: os.path.join(file_prefix, fn)
+        warc_path = lambda fn: os.path.join(options.file_prefix, fn)
     else:
         warc_path = None
 
