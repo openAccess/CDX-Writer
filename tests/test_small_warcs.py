@@ -9,31 +9,31 @@ import sys
 # {warc-filename: output-of-cdx_writer.py--all-records, ...}
 warcs_all_records = {
      #from IMF NLI ingest 2018-08
-    '10_digit_date.arc.gz': [
-        b'filedesc://IM_NLI_fb-20160209153640-00005-ext.arc 20160209153640 filedesc://IM_NLI_fb-20160209153640-00005-ext.arc warc/filedesc - PSBTZHIJYAY6LJM4WFI2NCA7X6OQ3FMF - - 666 0 10_digit_date.arc.gz',
-        b'com,facebook)/vanishing-ireland-110498185666457 20160209000000 https://www.facebook.com/Vanishing-Ireland-110498185666457/ text/html 200 2QHUP2CGE5UURBV5YBDCEQR6SHQ3MSOW - - 71299 666 10_digit_date.arc.gz'
-    ],
+    # '10_digit_date.arc.gz': [
+    #     b'filedesc://IM_NLI_fb-20160209153640-00005-ext.arc 20160209153640 filedesc://IM_NLI_fb-20160209153640-00005-ext.arc warc/filedesc - PSBTZHIJYAY6LJM4WFI2NCA7X6OQ3FMF - - 666 0 10_digit_date.arc.gz',
+    #     b'com,facebook)/vanishing-ireland-110498185666457 20160209000000 https://www.facebook.com/Vanishing-Ireland-110498185666457/ text/html 200 2QHUP2CGE5UURBV5YBDCEQR6SHQ3MSOW - - 71299 666 10_digit_date.arc.gz'
+    # ],
      #from IMF ingest 2018-08
-    '14_digit_plus_text_date.arc.gz': [
-        b'filedesc://IM_NLI_test_fb-20160211113933-00417-ext.arc 20160211113933 filedesc://IM_NLI_test_fb-20160211113933-00417-ext.arc warc/filedesc - O5XJHHCGP7QZESK2PGLRJWGLCLLXVQHA - - 659 0 14_digit_plus_text_date.arc.gz',
-        b'net,fbcdn,xx,scontent-cdg2-1)/300261_10150266886136400_4821326_n. 20160211000000 https://scontent-cdg2-1.xx.fbcdn.net/300261_10150266886136400_4821326_n. text/html 200 ZRNNAI6EJ7HCNZWNB4ZNHQSXBWTEXZQ7 - - 1072 659 14_digit_plus_text_date.arc.gz'
-    ],
+    # '14_digit_plus_text_date.arc.gz': [
+    #     b'filedesc://IM_NLI_test_fb-20160211113933-00417-ext.arc 20160211113933 filedesc://IM_NLI_test_fb-20160211113933-00417-ext.arc warc/filedesc - O5XJHHCGP7QZESK2PGLRJWGLCLLXVQHA - - 659 0 14_digit_plus_text_date.arc.gz',
+    #     b'net,fbcdn,xx,scontent-cdg2-1)/300261_10150266886136400_4821326_n. 20160211000000 https://scontent-cdg2-1.xx.fbcdn.net/300261_10150266886136400_4821326_n. text/html 200 ZRNNAI6EJ7HCNZWNB4ZNHQSXBWTEXZQ7 - - 1072 659 14_digit_plus_text_date.arc.gz'
+    # ],
     #from IMF UNESCO ingest 2018-08
-    '15_digit_date.arc.gz': [
-        b'filedesc://IM_UNESCO_122015-twitter.com_unesco_fr-20160113115026-00001-ext.arc 20160113115026 filedesc://IM_UNESCO_122015-twitter.com_unesco_fr-20160113115026-00001-ext.arc warc/filedesc - HPFTNFJ64ZUZW4RFTNEIVLUK2NRGX6NN - - 673 0 15_digit_date.arc.gz',
-        b'com,twitter)/unesco_fr.xml 20151200000000 http://twitter.com/unesco_fr.xml text/xml 200 Q6TYZPCHPZEMHLLIXWNW6MBBCGAJV3MR - - 723272 673 15_digit_date.arc.gz'
-    ],
+    # '15_digit_date.arc.gz': [
+    #     b'filedesc://IM_UNESCO_122015-twitter.com_unesco_fr-20160113115026-00001-ext.arc 20160113115026 filedesc://IM_UNESCO_122015-twitter.com_unesco_fr-20160113115026-00001-ext.arc warc/filedesc - HPFTNFJ64ZUZW4RFTNEIVLUK2NRGX6NN - - 673 0 15_digit_date.arc.gz',
+    #     b'com,twitter)/unesco_fr.xml 20151200000000 http://twitter.com/unesco_fr.xml text/xml 200 Q6TYZPCHPZEMHLLIXWNW6MBBCGAJV3MR - - 723272 673 15_digit_date.arc.gz'
+    # ],
     #from INA-HISTORICAL-1996-GROUP-AAA-20100812000000-00000-c/INA-HISTORICAL-2000-GROUP-ACS-20100812000000-00001.arc.gz
-    # 3.x had incorrect digest FL5ZDSVRACUUD2GUCKOWWY6LPPLR7TSJ (included extra '' at the end) for response record
+    # has two padding '\n's. 3.x had incorrect digest FL5ZDSVRACUUD2GUCKOWWY6LPPLR7TSJ (included extra '\n' at the end) for response record
     '16_digit_date.arc.gz': [
         b'filedesc://INA-HISTORICAL-2000-GROUP-ACS-20100812000000-00001.arc 20100812000000 filedesc://INA-HISTORICAL-2000-GROUP-ACS-20100812000000-00001.arc warc/filedesc - VXEDWGPHSNERWHDOUD6YWRWNT4ZOLEX4 - - 168 0 16_digit_date.arc.gz',
         b'com,afp)/home/img/es.gif 20000823054100 http://www.afp.com:80/home/img/es.gif image/gif 200 TUQLSV5PWCWHL2X3O67JULYLMWXGA252 - - 936 168 16_digit_date.arc.gz'
     ],
     #from IMG_XAB_001010144441-c/IMG_XBB_000918161534.arc.gz
-    '18_digit_date.arc.gz': [
-        b'filedesc:///ia/crawl1/md1/2000-09-18-13-36-crawl/IMG_XBB_000918161534.arc 20000918231534 filedesc:///ia/crawl1/md1/2000-09-18-13-36-crawl/IMG_XBB_000918161534.arc warc/filedesc - VXEDWGPHSNERWHDOUD6YWRWNT4ZOLEX4 - - 181 0 18_digit_date.arc.gz',
-        b'com,spaceports,mars)/~jddp/images/links_off.gif 20000918002300 http://mars.spaceports.com:80/~jddp/images/links_off.gif image/gif 200 V7FZGUGSTVX4EKWAT46CTBB47KSIYO7F - - 1165 181 18_digit_date.arc.gz'
-    ],
+    # '18_digit_date.arc.gz': [
+    #     b'filedesc:///ia/crawl1/md1/2000-09-18-13-36-crawl/IMG_XBB_000918161534.arc 20000918231534 filedesc:///ia/crawl1/md1/2000-09-18-13-36-crawl/IMG_XBB_000918161534.arc warc/filedesc - VXEDWGPHSNERWHDOUD6YWRWNT4ZOLEX4 - - 181 0 18_digit_date.arc.gz',
+    #     b'com,spaceports,mars)/~jddp/images/links_off.gif 20000918002300 http://mars.spaceports.com:80/~jddp/images/links_off.gif image/gif 200 V7FZGUGSTVX4EKWAT46CTBB47KSIYO7F - - 1165 181 18_digit_date.arc.gz'
+    # ],
     # from ARCHIVEIT-7855-TEST-JOB270756-SEED1365208-20170303022116385-00000-qh0i1erc.warc.gz
     '304-response.warc.gz': [
         b'gov,nasa,kepler)/layout/mws/main.css 20170303024245 https://kepler.nasa.gov/layout/mws/main.css unk 304 3I42H3S6NNFQ2MSVX7XZKYAYSCX5QBYJ - - 630 0 304-response.warc.gz'
@@ -42,10 +42,10 @@ warcs_all_records = {
         b'org,wikipedia)/ 20170329205748 https://www.wikipedia.org/ warc/revisit - LC43NA4MJILWX5KPDVBVIRD2OMPTNLJD - - 356 0 304-revisit.warc.gz'
     ],
     #from INA-HISTORICAL-1996-GROUP-AAA-20100812000000-00000-c/INA-HISTORICAL-2000-GROUP-ACS-20100812000000-00001.arc.gz, fixed in warctools changeset 92:ca95fa09848b
-    'alexa_charset_in_header.arc.gz': [
-        b'filedesc://INA-HISTORICAL-2000-GROUP-ACS-20100812000000-00001.arc 20100812000000 filedesc://INA-HISTORICAL-2000-GROUP-ACS-20100812000000-00001.arc warc/filedesc - VXEDWGPHSNERWHDOUD6YWRWNT4ZOLEX4 - - 168 0 alexa_charset_in_header.arc.gz',
-        b'fr,allocine,free)/tv/cineaction.asp 20000824015105 http://free.allocine.fr:80/tv/cineaction.asp text/html 200 YSO3GBFJ7KRO3OPF7J43J4NMM4LVR7ZY - - 3974 168 alexa_charset_in_header.arc.gz'
-    ],
+    # 'alexa_charset_in_header.arc.gz': [
+    #     b'filedesc://INA-HISTORICAL-2000-GROUP-ACS-20100812000000-00001.arc 20100812000000 filedesc://INA-HISTORICAL-2000-GROUP-ACS-20100812000000-00001.arc warc/filedesc - VXEDWGPHSNERWHDOUD6YWRWNT4ZOLEX4 - - 168 0 alexa_charset_in_header.arc.gz',
+    #     b'fr,allocine,free)/tv/cineaction.asp 20000824015105 http://free.allocine.fr:80/tv/cineaction.asp text/html 200 YSO3GBFJ7KRO3OPF7J43J4NMM4LVR7ZY - - 3974 168 alexa_charset_in_header.arc.gz'
+    # ],
     'alexa_short_header.arc.gz': [
         b'filedesc://51_23_20110804181044_crawl101.arc.gz 20110804181044 filedesc://51_23_20110804181044_crawl101.arc.gz warc/filedesc - 3I42H3S6NNFQ2MSVX7XZKYAYSCX5QBYJ - - 161 0 alexa_short_header.arc.gz',
         b'net,killerjo)/robots.txt 20110804181142 http://www.killerjo.net:80/robots.txt unk 200 YZI2NMZ5ILYICUL3PNYVYQR3KI2YY5EH - - 139 161 alexa_short_header.arc.gz'
@@ -55,11 +55,11 @@ warcs_all_records = {
         b'filedesc://crc24.20001110112006.arc 20001110112000 filedesc://crc24.20001110112006.arc warc/filedesc - VXEDWGPHSNERWHDOUD6YWRWNT4ZOLEX4 - - 179 0 arc_v1_with_v2_header.arc.gz',
         b'com,cdnow)/cgi-bin/mserver/pagename=/rp/cdn/find/discography.html/artistid=henderson*joe/select=music 20001110112000 http://www.cdnow.com:80/cgi-bin/mserver/pagename=/RP/CDN/FIND/discography.html/artistid=HENDERSON*JOE/select=music text/html 200 Z7XLU7KXZVH3AAC6ZZLMMRVWPHC44ALO - - 8884 179 arc_v1_with_v2_header.arc.gz'
     ],
-    'bad_mime_type.arc.gz': [
-        b'filedesc://live-20120407151931218-00299.arc 20120407151931 filedesc://live-20120407151931218-00299.arc warc/filedesc - VXEDWGPHSNERWHDOUD6YWRWNT4ZOLEX4 - - 153 0 bad_mime_type.arc.gz',
-        b'net,naver,cafethumb)/20101223_84/qkrgns3_129303386816936xuq_jpg/imag0030_qkrgns3.jpg 20120407152447 http://cafethumb.naver.net/20101223_84/qkrgns3_129303386816936xUq_jpg/imag0030_qkrgns3.jpg unk 200 OUK52MTLKPEA6STHTFFPFI2JP7G4QBUZ - - 3587 153 bad_mime_type.arc.gz'
-    ],
-     # from 1213886081714_1-c/1213886929852_11.arc.gz, contains unicode replacement char. has "Transfer-Encoding:chunked" but response body is not chunk-encoded
+    # 'bad_mime_type.arc.gz': [
+    #     b'filedesc://live-20120407151931218-00299.arc 20120407151931 filedesc://live-20120407151931218-00299.arc warc/filedesc - VXEDWGPHSNERWHDOUD6YWRWNT4ZOLEX4 - - 153 0 bad_mime_type.arc.gz',
+    #     b'net,naver,cafethumb)/20101223_84/qkrgns3_129303386816936xuq_jpg/imag0030_qkrgns3.jpg 20120407152447 http://cafethumb.naver.net/20101223_84/qkrgns3_129303386816936xUq_jpg/imag0030_qkrgns3.jpg unk 200 OUK52MTLKPEA6STHTFFPFI2JP7G4QBUZ - - 3587 153 bad_mime_type.arc.gz'
+    # ],
+    # from 1213886081714_1-c/1213886929852_11.arc.gz, contains unicode replacement char. has "Transfer-Encoding:chunked" but response body is not chunk-encoded
     'bad_unicode_host.arc.gz': [
         b'filedesc://1213886929852_11.arc.gz 20080619074849 filedesc://1213886929852_11.arc.gz warc/filedesc - VXEDWGPHSNERWHDOUD6YWRWNT4ZOLEX4 - - 158 0 bad_unicode_host.arc.gz',
         b'net,82,t%ef%bf%bd%04)/ 20080509130938 http://www.t%EF%BF%BD%04.82.net/ text/html 200 V6CPFAFQFDRK2BWCGRXEZYKAGOUMWYM5 - - 416 158 bad_unicode_host.arc.gz'
@@ -89,12 +89,12 @@ warcs_all_records = {
     'crlf_at_1k_boundary_2.warc.gz': [
         b'au,com,grandtourer)/aspx/login.aspx?4=h6vklmshqnbpvsscb7x7iu2/luokwckr5nsukefi3ygag1wtqor9vtiwv+anh9su4shtqmrrjy53dhqpxif+vjqkb+tajvfhn/sn1oqgaxly4i1ciwbi6jbk+i0fqqn44wt18szrgn95ygnruk9baymdquzchh7i/pak180zcfccrud+lqmmukvlvg0qoq6kvbos8dqo3mh5unwoclxiid2+mbma2rfp/015+o5+dnrq/umof3aettvsy7i/bcmgkbn/6wqknr04kfi4ppwjig2vcw4av8hj2fqbo+3jutdryfgyulizuqjebrh0lmah9sgkrpomwa0hgzmvf1ahoyqbvnbwujeekckxrydnd+dtxyozqlpygn/gcedbkoubmmmldsl+stl4qzomxngk3xnxiw+/csq/pwyimcbtdl/fxvnj6j4l3m5v66mjhxmyzk/wfp7spfzeghl+x4ih9dzzl8nqr/+ma7e6jhmyx4/dwkresqh3mzmiqddmdp6cjtnxapulfamv/tdy1vgjdl4pbiasartibf4nnxlglpvcy+cm3j83nybyytxbrx9+x1vcvnvpo8sipspuyp8xi0glnsmaw/u+owll28euzdlvanmz2j0rcdhtqkyejfhn/rm4z1gkhwn2rexkykbgtnuppthr08v6sur9kagw9dzdyut0go9fjshgpbmnm0uaujtzkshhi0uriz2cnn+arsppeayooy3yedrv7vklewh6mj3yjqfzwj4tbq75wecrm9gw4p+7uwal4wc92gjdip7g1p2cm4vbtvahp1ntq+shd4oot5r6hza2igo85st3ftgfvfj7eolin+dixrjdwa== 20120422095915 https://www.grandtourer.com.au/Aspx/Login.aspx?4=H6VKLMsHqnBpvsscB7x7Iu2%2fLUOKwCKr5nsukefI3ygAG1WTqOR9vtiWv%2banh9sU4sHTQmRRJY53DHQpXiF%2bVjqKB%2btaJvfHn%2fSN1OQgaxlY4i1Ciwbi6jbK%2bI0fQqn44Wt18szRgN95ygNRUK9BaYMdqUzChH7I%2fpAk180zCFCCRUD%2bLqMMuKvLVg0qOQ6Kvbos8DqO3MH5UnwOcLxiID2%2bmBMA2Rfp%2f015%2bo5%2bDNRq%2fUMOF3aETtvSY7i%2fbCmGKBn%2f6WqkNr04Kfi4PPWJIg2VCw4AV8hj2FqbO%2b3JUtdRYfGYulizuQJEbrh0LMah9sGKRPomWA0hgZmvf1AHoYqbVNbwUJeEKCKxrYdND%2bDtxyOzQlpygN%2fgCeDbKOuBMMMLdSl%2bsTl4qZoMXnGK3XNxiw%2b%2fcsq%2fPWyIMCBtdl%2ffXvnJ6J4L3M5v66mjhXmyZk%2fwfp7SpfzegHL%2bX4iH9DZzl8nqr%2f%2bmA7E6JHmyX4%2fDWKrEsqH3MZMIqddmDp6cJtnxAPULfAmv%2fTDY1VGJdl4PBIASArTIBF4nnXLglpvcy%2bcm3j83nyByyTxbRX9%2bX1VcVNvPo8SIpSpuYP8xi0GlNsMaW%2fu%2bowll28EUzDLVAnMz2j0rcdhTqKYEJfhN%2frm4Z1gKhwn2REXKykBGTnupPtHR08V6Sur9kAgW9DZdyUt0Go9fJshGPBmNm0uAUjtzkshhI0UrIz2cnn%2bArspPeaYOOY3YEdrV7VKlEWh6Mj3yjQFZwj4TbQ75WECrM9Gw4p%2b7uWaL4wc92gjDiP7G1P2cM4vBTVAHP1nTQ%2bShD4OoT5r6hZA2igo85St3ftgfvfJ7eOLin%2bdixRJdwA%3d%3d text/html 200 5STDGW7HDWZQ4TPS4GPBOL3TEG7NQRHE - - 6934 0 crlf_at_1k_boundary_2.warc.gz'
     ],
-    'date_resolution_microsecond.warc.gz': [
-        b'gov,fcc)/ecfs/search/filings?date_disseminated=[gte]1992-01-09[lte]1992-01-09&limit=100&sort=date_disseminated,desc 20191118125603 https://www.fcc.gov/ecfs/search/filings?date_disseminated=%5Bgte%5D1992-01-09%5Blte%5D1992-01-09&limit=100&sort=date_disseminated,DESC warc/request - I5OL3NNFS3IQMIR7WBSTBCQSWGODBTOT - - 551 0 date_resolution_microsecond.warc.gz'
-    ],
-    'date_resolution_nanosecond.warc.gz': [
-        b'gov,fcc)/ecfs/search/filings?date_disseminated=[gte]1992-01-09[lte]1992-01-09&limit=100&sort=date_disseminated,desc 20191118125603 https://www.fcc.gov/ecfs/search/filings?date_disseminated=%5Bgte%5D1992-01-09%5Blte%5D1992-01-09&limit=100&sort=date_disseminated,DESC warc/request - I5OL3NNFS3IQMIR7WBSTBCQSWGODBTOT - - 552 0 date_resolution_nanosecond.warc.gz'
-    ],
+    # 'date_resolution_microsecond.warc.gz': [
+    #     b'gov,fcc)/ecfs/search/filings?date_disseminated=[gte]1992-01-09[lte]1992-01-09&limit=100&sort=date_disseminated,desc 20191118125603 https://www.fcc.gov/ecfs/search/filings?date_disseminated=%5Bgte%5D1992-01-09%5Blte%5D1992-01-09&limit=100&sort=date_disseminated,DESC warc/request - I5OL3NNFS3IQMIR7WBSTBCQSWGODBTOT - - 551 0 date_resolution_microsecond.warc.gz'
+    # ],
+    # 'date_resolution_nanosecond.warc.gz': [
+    #     b'gov,fcc)/ecfs/search/filings?date_disseminated=[gte]1992-01-09[lte]1992-01-09&limit=100&sort=date_disseminated,desc 20191118125603 https://www.fcc.gov/ecfs/search/filings?date_disseminated=%5Bgte%5D1992-01-09%5Blte%5D1992-01-09&limit=100&sort=date_disseminated,DESC warc/request - I5OL3NNFS3IQMIR7WBSTBCQSWGODBTOT - - 552 0 date_resolution_nanosecond.warc.gz'
+    # ],
     # Pathological: Empty HTTP payload, header ends with single "\n"
     'empty_payload_header_ending_with_lf.arc.gz': [
         b'1,120,179,210)/test 20030801004548 http://210.179.120.1/test unk 200 3I42H3S6NNFQ2MSVX7XZKYAYSCX5QBYJ - - 222 0 empty_payload_header_ending_with_lf.arc.gz'
@@ -210,19 +210,19 @@ warcs_all_records = {
 
 # {warc-filename: output-of-cdx_writer.py-with-no-options, ...}
 warcs_defaults = {
-    '16_digit_date.arc.gz': [
-        b'com,afp)/home/img/es.gif 20000823054100 http://www.afp.com:80/home/img/es.gif image/gif 200 TUQLSV5PWCWHL2X3O67JULYLMWXGA252 - - 936 168 16_digit_date.arc.gz'
-    ],
-    '18_digit_date.arc.gz': [
-        b'com,spaceports,mars)/~jddp/images/links_off.gif 20000918002300 http://mars.spaceports.com:80/~jddp/images/links_off.gif image/gif 200 V7FZGUGSTVX4EKWAT46CTBB47KSIYO7F - - 1165 181 18_digit_date.arc.gz'
-    ],
+    # '16_digit_date.arc.gz': [
+    #     b'com,afp)/home/img/es.gif 20000823054100 http://www.afp.com:80/home/img/es.gif image/gif 200 TUQLSV5PWCWHL2X3O67JULYLMWXGA252 - - 936 168 16_digit_date.arc.gz'
+    # ],
+    # '18_digit_date.arc.gz': [
+    #     b'com,spaceports,mars)/~jddp/images/links_off.gif 20000918002300 http://mars.spaceports.com:80/~jddp/images/links_off.gif image/gif 200 V7FZGUGSTVX4EKWAT46CTBB47KSIYO7F - - 1165 181 18_digit_date.arc.gz'
+    # ],
     # from ARCHIVEIT-7855-TEST-JOB270756-SEED1365208-20170303022116385-00000-qh0i1erc.warc.gz written by warcprox 2.1b1 written by warcprox 2.1b1.dev54
     '304-response.warc.gz': [],
     # from WEB-20170329205740560-00000-11979~macbook-pro.monkeybrains.net~6440.warc.gz written by Heritrix/3.3.0-SNAPSHOT-2017-03-14T22:20:41Z
     '304-revisit.warc.gz': [],
-    'alexa_charset_in_header.arc.gz': [
-        b'fr,allocine,free)/tv/cineaction.asp 20000824015105 http://free.allocine.fr:80/tv/cineaction.asp text/html 200 YSO3GBFJ7KRO3OPF7J43J4NMM4LVR7ZY - - 3974 168 alexa_charset_in_header.arc.gz'
-    ],
+    # 'alexa_charset_in_header.arc.gz': [
+    #     b'fr,allocine,free)/tv/cineaction.asp 20000824015105 http://free.allocine.fr:80/tv/cineaction.asp text/html 200 YSO3GBFJ7KRO3OPF7J43J4NMM4LVR7ZY - - 3974 168 alexa_charset_in_header.arc.gz'
+    # ],
     # empty mimetype field in ARC header, non-HTTP content. 3.x emitted no statuscode. 4.x emits assumed 200.
     'alexa_short_header.arc.gz': [
         b'net,killerjo)/robots.txt 20110804181142 http://www.killerjo.net:80/robots.txt unk 200 YZI2NMZ5ILYICUL3PNYVYQR3KI2YY5EH - - 139 161 alexa_short_header.arc.gz'
@@ -230,9 +230,9 @@ warcs_defaults = {
     'arc_v1_with_v2_header.arc.gz': [
         b'com,cdnow)/cgi-bin/mserver/pagename=/rp/cdn/find/discography.html/artistid=henderson*joe/select=music 20001110112000 http://www.cdnow.com:80/cgi-bin/mserver/pagename=/RP/CDN/FIND/discography.html/artistid=HENDERSON*JOE/select=music text/html 200 Z7XLU7KXZVH3AAC6ZZLMMRVWPHC44ALO - - 8884 179 arc_v1_with_v2_header.arc.gz',
     ],
-    'bad_mime_type.arc.gz': [
-        b'net,naver,cafethumb)/20101223_84/qkrgns3_129303386816936xuq_jpg/imag0030_qkrgns3.jpg 20120407152447 http://cafethumb.naver.net/20101223_84/qkrgns3_129303386816936xUq_jpg/imag0030_qkrgns3.jpg unk 200 OUK52MTLKPEA6STHTFFPFI2JP7G4QBUZ - - 3587 153 bad_mime_type.arc.gz'
-    ],
+    # 'bad_mime_type.arc.gz': [
+    #     b'net,naver,cafethumb)/20101223_84/qkrgns3_129303386816936xuq_jpg/imag0030_qkrgns3.jpg 20120407152447 http://cafethumb.naver.net/20101223_84/qkrgns3_129303386816936xUq_jpg/imag0030_qkrgns3.jpg unk 200 OUK52MTLKPEA6STHTFFPFI2JP7G4QBUZ - - 3587 153 bad_mime_type.arc.gz'
+    # ],
     'bad_unicode_host.arc.gz': [
         b'net,82,t%ef%bf%bd%04)/ 20080509130938 http://www.t%EF%BF%BD%04.82.net/ text/html 200 V6CPFAFQFDRK2BWCGRXEZYKAGOUMWYM5 - - 416 158 bad_unicode_host.arc.gz'
     ],
