@@ -65,8 +65,11 @@ else:
     # Python 2 HTTPResponse is an old class. We need a new-style base class
     HTTPResponseParserBase = type('HTTPResponseParserBase', (object, HTTPResponse), {})
 
-# raise header count limit
-six.moves.http_client._MAXHEADERS = 1000
+# raise header count limit (default 100)
+six.moves.http_client._MAXHEADERS = 3000
+# raise header line length limit (default 65536)
+# (-1 because HTTPResponse adds 1 to it)
+six.moves.http_client._MAXLINE = (1 * 1024 * 1024 - 1)
 
 class HTTPResponseParser(HTTPResponseParserBase):
     def __init__(self, fileobj):
