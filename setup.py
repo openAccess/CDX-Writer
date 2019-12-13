@@ -12,6 +12,10 @@ setup(
         'surt==0.3.1'
     ],
     extras_require={
+        'zstd': [
+            # requires a version locally patched for correct single-frame decompression
+            'zstandard==0.12.0+ia1'
+        ],
         'test': [
             'pytest<5'
         ]

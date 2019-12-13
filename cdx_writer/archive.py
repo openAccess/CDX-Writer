@@ -15,11 +15,17 @@ from __future__ import unicode_literals
 import re
 import hanzo
 from hanzo.warctools import ArchiveRecord
-from hanzo.warctools.stream import open_record_stream
+from hanzo.warctools.stream import open_record_stream as _open_record_stream
 from .handler import ParseError
 
 from hanzo.warctools.arc import SPLIT, ArcParser, ArcRecord
+from hanzo.warctools.warc import WarcRecord
 from hanzo.warctools.stream import RecordStream, GeeZipFile, GzipRecordStream
+
+try:
+    from .zstdstream import ZstdRecordStream
+except ImportError:
+    ZstdRecordStream = None
 
 ARC_HEADER_V1 = [ArcRecord.URL, ArcRecord.IP, ArcRecord.DATE, ArcRecord.CONTENT_TYPE,
                  ArcRecord.CONTENT_LENGTH]
@@ -211,6 +217,19 @@ class PatchedGzipRecordStream(GzipRecordStream):
 
 
 hanzo.warctools.stream.GzipRecordStream = PatchedGzipRecordStream
+
+def open_record_stream(record_class=None, filename=None, file_handle=None,
+                       mode='rb', gzip='auto', offset=None, length=None):
+    # assumes our specific way of calling. does not support general usage.
+    assert record_class is None and filename is not None and file_handle is None
+    assert offset is None
+    if filename.endswith('.zst'):
+        if ZstdRecordStream is None:
+            raise RuntimeError('.zst archive support is not available (requires zstandard.cffi)')
+        file_handle = open(filename, mode=mode)
+        record_parser = WarcRecord.make_parser()
+        return ZstdRecordStream(file_handle, record_parser)
+    return _open_record_stream(record_class, filename, file_handle, mode, gzip, offset, length)
 
 from hanzo.warctools.archive_detect import register_record_type
 
