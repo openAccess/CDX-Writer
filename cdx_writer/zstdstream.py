@@ -5,12 +5,14 @@ from hanzo.warctools.stream import RecordStream
 import zstandard.cffi as zstd
 
 class ZstdRecordStream(RecordStream):
-    def __init__(self, file_handle, record_parser):
+    def __init__(self, file_handle, record_parser, zdict=b''):
         """A stream to read/write archive record in individual zstandard-compressed frames.
         """
-        dict_data = b''
-        cdict = zstd.ZstdCompressionDict(dict_data)
-        self.dctx = zstd.ZstdDecompressor(dict_data=cdict)
+        if zdict is None:
+            zdict = b''
+        if isinstance(zdict, bytes):
+            zdict = zstd.ZstdCompressionDict(zdict)
+        self.dctx = zstd.ZstdDecompressor(dict_data=zdict)
         self.raw_fh = file_handle
         RecordStream.__init__(self, self._decompress_reader(), record_parser)
 
@@ -51,5 +53,63 @@ class ZstdRecordStream(RecordStream):
         # untested
         self.raw_fh.seek(offset, pos)
         self.fh = self._decompress_reader()
+
+# zstd.get_frame_parameters(data) returns FrameParameters object, which does not copy
+# frameType from raw ZSTD_frameHeader struct.
+# TODO: propose addtion of frame_type attribute.
+class FrameParametersEx(zstd.FrameParameters):
+    def __init__(self, fparams):
+        zstd.FrameParameters.__init__(self, fparams)
+        self.frame_type = fparams.frameType
+        # headerSize is always 0 for skippable frames. no use to copy.
+        #self.header_size = fparams.headerSize
+
+def _get_frame_parameters(data):
+    params = zstd.ffi.new('ZSTD_frameHeader *')
+
+    data_buffer = zstd.ffi.from_buffer(data)
+    zresult = zstd.lib.ZSTD_getFrameHeader(params, data_buffer, len(data_buffer))
+    if zstd.lib.ZSTD_isError(zresult):
+        raise zstd.ZstdError('cannot get frame parameters: %s' %
+                        _zstd_error(zresult))
+
+    if zresult:
+        raise zstd.ZstdError('not enough data for frame parameters; need %d bytes' %
+                        zresult)
+
+    return FrameParametersEx(params[0])
+
+def get_zstd_dictionary(fobj):
+    # method 1: the first skippable frame
+    # frame header is 2 to 14 bytes.
+    if  hasattr(fobj, 'peek'):
+        data = fobj.peek(4 + 14)
+    else:
+        data = fobj.read(4 + 14)
+        fobj.seek(-len(data), 1)
+    try:
+        frame_params = _get_frame_parameters(data)
+        # dictionary frame must meet following conditions:
+        # * it is a skippable frame (frame_type == 1)
+        # * it has frame_content_size > 0
+        # * it does not have dict
+        # dictionary frame must not have dictionary
+        if frame_params.frame_type == 1 and frame_params.dict_id == 0:
+            content_size = frame_params.content_size
+            if content_size != zstd.lib.ZSTD_CONTENTSIZE_UNKNOWN:
+                # getFrameHeader() does not set headerSize. Assume fixed length 8
+                fobj.seek(8, 1)
+                zdict = fobj.read(content_size)
+                assert len(zdict) == content_size
+                if frame_params.has_checksum:
+                    fobj.seek(4, 1)
+                # TODO: zdict could be zstd-compressed.
+                magic = zdict[:4]
+                if magic == b'\x37\xa4\x30\xec':
+                    return zdict
+        return b''
+    except zstd.ZstdError:
+        return b''
+
 
 
