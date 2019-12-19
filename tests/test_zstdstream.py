@@ -1,11 +1,16 @@
-from cdx_writer.zstdstream import ZstdRecordStream, get_zstd_dictionary
-from hanzo.warctools.warc import WarcRecord
-import zstandard.cffi as zstd
-
 import io
 import random
 import struct
 import pytest
+
+from hanzo.warctools.warc import WarcRecord
+try:
+    from cdx_writer.zstdstream import ZstdRecordStream, get_zstd_dictionary
+    import zstandard.cffi as zstd
+except ImportError:
+    pytestmark = pytest.mark.skip(
+        "skipping zstandard tests as zstandard.cffi is unavailable")
+
 
 def random_content():
     n = random.randint(200, 1000)
