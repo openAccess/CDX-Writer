@@ -226,7 +226,6 @@ def open_record_stream(record_class=None, filename=None, file_handle=None,
     if filename.endswith('.zst'):
         if ZstdRecordStream is None:
             raise RuntimeError('.zst archive support is not available (requires zstandard.cffi)')
-        zdict =get_zstd_dictionary(filename)
         file_handle = open(filename, mode=mode)
         record_parser = WarcRecord.make_parser()
         # find dictionary

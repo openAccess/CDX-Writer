@@ -77,7 +77,6 @@ def test_get_zstd_dictionary(tmpdir):
         for rec in records:
             w.write(cctx.compress(rec))
 
-    pytest.set_trace()
     with warc.open('rb') as f:
         zdict = get_zstd_dictionary(f)
 
