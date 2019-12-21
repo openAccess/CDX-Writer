@@ -58,7 +58,10 @@ class DigestingReader(io.RawIOBase):
             self.complete = True
         return n
 
-from six.moves.http_client import HTTPResponse, BadStatusLine, UnknownProtocol
+from six.moves.http_client import (
+    HTTPResponse, BadStatusLine, UnknownProtocol, HTTPMessage,
+    CONTINUE,NO_CONTENT, NOT_MODIFIED
+)
 if issubclass(HTTPResponse, object):
     HTTPResponseParserBase = HTTPResponse
 else:
@@ -91,6 +94,71 @@ class HTTPResponseParser(HTTPResponseParserBase):
             # no response from server, even a status line. old-style revisit
             # record looks like this.
             return 'HTTP/0.9', 200, ""
+
+    # overridden to make it mmore lenient with sloppy implementations
+    def begin(self):
+        if self.msg is not None:
+            return
+        # this loop is skipping 100 response and its headers.
+        # I've never seen 100 responses captured in response records,
+        # but there may be in the future.
+        while True:
+            version, status, reason = self._read_status()
+            if status != CONTINUE:
+                break
+            while True:
+                skip = self.fp.readline()
+                if not skip.strip():
+                    break
+        self.status = status
+        self.reason = reason.strip()
+        if version == 'HTTP/1.0':
+            self.version = 10
+        elif version.startswith('HTTP/1.'):
+            self.version = 11 # HTTP/1.x (x>=1) is assumed to be HTTP/1.1
+        elif version == 'HTTP/0.9':
+            self.version = 9
+        elif version.startswith('HTTP/'):
+            # added branch - assume any other 'HTTP/...' as HTTP/1.0
+            self.version = 10
+        else:
+            raise UnknownProtocol(version)
+
+        self.will_close = 1
+
+        if self.version == 9:
+            self.length = None
+            self.chunked = 0
+            self.msg = HTTPMessage(io.BytesIO())
+            return
+
+        self.msg = HTTPMessage(self.fp, 0)
+        self.msg.fp = None
+
+        tr_enc = self.msg.getheader('transfer-encoding')
+        if tr_enc and tr_enc.lower() == 'chunked':
+            self.chunked = 1
+            self.chunk_left = None
+        else:
+            self.chunked = 0
+
+        # it should not be critical to have length. we could
+        # blanketly set length = None?
+        length = self.msg.getheader('content-length')
+        if length and not self.chunked:
+            try:
+                self.length = int(length)
+            except ValueError:
+                self.length = None
+            else:
+                if self.length < 0:
+                    self.length = None
+        else:
+            self.length = None
+
+        if (status == NO_CONTENT or status == NOT_MODIFIED or
+            100 <- status < 200):
+            self.length = 0
 
     # io.RawIOBase compatibility (necessary for handling calls from DigestingReader)
     def readinto(self, b):
