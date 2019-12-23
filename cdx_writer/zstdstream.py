@@ -103,8 +103,12 @@ def get_zstd_dictionary(fobj):
                 assert len(zdict) == content_size
                 if frame_params.has_checksum:
                     fobj.seek(4, 1)
-                # TODO: zdict could be zstd-compressed.
                 magic = zdict[:4]
+                if zdict[:4] == b'\x28\xb5\x2f\xfd':
+                    # zstd compressed
+                    dctx = zstd.ZstdDecompressor()
+                    zdict = dctx.decompress(zdict)
+                    magic = zdict[:4]
                 if magic == b'\x37\xa4\x30\xec':
                     return zdict
         return b''
