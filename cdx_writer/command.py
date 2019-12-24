@@ -1,3 +1,4 @@
+from __future__ import print_function
 import sys
 import os
 import json
@@ -98,6 +99,7 @@ class CDX_Writer(object):
             'num_records_processed': 0,
             'num_records_included': 0,
             'num_records_filtered': 0,
+            'num_records_failed': 0
         }
         if hasattr(self.out_file, "write"):
             self._make_cdx(self.out_file, self.stats)
@@ -110,32 +112,38 @@ class CDX_Writer(object):
 
         record_reader = ArchiveRecordReader(self.in_file)
         for record in record_reader:
-            stats['num_records_processed'] += 1
-            handler = self.dispatcher.dispatch(record, self)
-            if not handler:
-                continue
-            assert isinstance(handler, RecordHandler)
+            try:
+                stats['num_records_processed'] += 1
+                handler = self.dispatcher.dispatch(record, self)
+                if not handler:
+                    continue
+                assert isinstance(handler, RecordHandler)
 
-            ### arc files from the live web proxy can have a negative content length and a missing payload
-            ### check the content_length from the arc header, not the computed payload size returned by record.content_length
-            # XXX move this to dispatcher.
-            content_length_str = record.get_header(record.CONTENT_LENGTH)
-            if content_length_str is not None and int(content_length_str) < 0:
-                continue
+                ### arc files from the live web proxy can have a negative content length and a missing payload
+                ### check the content_length from the arc header, not the computed payload size returned by record.content_length
+                # XXX move this to dispatcher.
+                content_length_str = record.get_header(record.CONTENT_LENGTH)
+                if content_length_str is not None and int(content_length_str) < 0:
+                    continue
 
-            surt = handler.massaged_url
-            if self.should_exclude(surt):
-                stats['num_records_filtered'] += 1
-                continue
+                surt = handler.massaged_url
+                if self.should_exclude(surt):
+                    stats['num_records_filtered'] += 1
+                    continue
 
-            ### precalculated data that is used multiple times
-            # self.headers, self.content = self.parse_headers_and_content(record)
-            # self.mime_type             = self.get_mime_type(record, use_precalculated_value=False)
+                ### precalculated data that is used multiple times
+                # self.headers, self.content = self.parse_headers_and_content(record)
+                # self.mime_type             = self.get_mime_type(record, use_precalculated_value=False)
 
-            values = [b'-' if v is None else v for v in self.fieldgetter(handler)]
-            out_file.write(b' '.join(values) + b'\n')
-            #record.dump()
-            stats['num_records_included'] += 1
+                values = [b'-' if v is None else v for v in self.fieldgetter(handler)]
+                out_file.write(b' '.join(values) + b'\n')
+                #record.dump()
+                stats['num_records_included'] += 1
+            except Exception as ex:
+                print('Error while processing a record at %d' % record.offset,
+                      file=sys.stderr)
+                stats['num_records_failed'] += 1
+                raise
 
         record_reader.close()
 

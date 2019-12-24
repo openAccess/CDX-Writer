@@ -66,7 +66,7 @@ else:
     HTTPResponseParserBase = type('HTTPResponseParserBase', (object, HTTPResponse), {})
 
 # raise header count limit (default 100)
-six.moves.http_client._MAXHEADERS = 3000
+six.moves.http_client._MAXHEADERS = 32767
 # raise header line length limit (default 65536)
 # (-1 because HTTPResponse adds 1 to it)
 six.moves.http_client._MAXLINE = (1 * 1024 * 1024 - 1)
