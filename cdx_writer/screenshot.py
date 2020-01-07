@@ -1,5 +1,5 @@
 from .handler import RecordHandler
-from .dispatcher import RecordDispatcher
+from .dispatcher import DefaultDispatcher
 
 class ScreenshotHandler(RecordHandler):
     @property
@@ -14,7 +14,7 @@ class ScreenshotHandler(RecordHandler):
     def mime_type(self):
         return self._normalize_content_type(self.record.content_type)
 
-class ScreenshotDispatcher(RecordDispatcher):
+class ScreenshotDispatcher(DefaultDispatcher):
     def dispatch_metadata(self, record, env):
         content_type = record.content_type
         if content_type and content_type.startswith('image/'):
