@@ -72,7 +72,7 @@ else:
 six.moves.http_client._MAXHEADERS = 32767
 # raise header line length limit (default 65536)
 # (-1 because HTTPResponse adds 1 to it)
-six.moves.http_client._MAXLINE = (1 * 1024 * 1024 - 1)
+six.moves.http_client._MAXLINE = (2 * 1024 * 1024 - 1)
 
 class HTTPResponseParser(HTTPResponseParserBase):
     def __init__(self, fileobj):
