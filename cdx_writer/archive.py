@@ -313,6 +313,13 @@ class ArchiveRecordEx(object):
         # header does not exist.
         return self.wrapped_record.content_length
 
+    @property
+    def ip_address(self):
+        # XXX ArcRecord and WarcRecord use different symbol for IP address
+        # (IP and IP_ADDRESS, respectively). using literals here.
+        return (self.get_header('ip-address') or
+                self.get_header('warc-ip-address'))
+
     def get_header(self, name):
         return self.wrapped_record.get_header(name)
 

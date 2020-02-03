@@ -31,6 +31,8 @@ class DefaultDispatcher(RecordDispatcher):
         # probbaly it's better to test for "dns:" scheme?
         if record.content_type in ('text/dns',):
             return None
+        if record.ip_address == b'127.0.0.1':
+            return None
 
         handler = ResponseHandler(record, env)
 
@@ -56,6 +58,8 @@ class DefaultDispatcher(RecordDispatcher):
         # exclude 304 Not Modified revisits (unless --all-records)
         if record.get_header('WARC-Profile') and record.get_header(
                 'WARC-Profile').endswith('/revisit/server-not-modified'):
+            return None
+        if record.ip_address == b'127.0.0.1':
             return None
         return RevisitHandler
 
