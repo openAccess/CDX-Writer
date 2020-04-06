@@ -147,7 +147,7 @@ warcs_all_records = {
     ],
     'negative_content_length.arc.gz': [
         b'filedesc://live-20120420173851608-04730.arc 20120420173851 filedesc://live-20120420173851608-04730.arc warc/filedesc - VXEDWGPHSNERWHDOUD6YWRWNT4ZOLEX4 - - 155 0 negative_content_length.arc.gz',
-        b'com,lastdaywatchers)/robots.txt 20120420180002 http://www.lastdaywatchers.com/robots.txt text/html 301 3I42H3S6NNFQ2MSVX7XZKYAYSCX5QBYJ - - 244 155 negative_content_length.arc.gz',
+        b'com,lastdaywatchers)/robots.txt 20120420180002 http://www.lastdaywatchers.com/robots.txt text/html 301 3I42H3S6NNFQ2MSVX7XZKYAYSCX5QBYJ S - 244 155 negative_content_length.arc.gz',
         b'com,diggheadlines)/robots.txt 20120420180002 http://diggheadlines.com/robots.txt unk 200 QUD4X4EYJB6TOGMGIXCFKF4Y4MOAL5GS - - 103 520 negative_content_length.arc.gz'
     ],
     #from INA-HISTORICAL-2002-GROUP-EVL-20100812000000-00001-c/INA-HISTORICAL-2002-GROUP-FFM-20100812000000-00000.arc.gz.
@@ -292,7 +292,7 @@ warcs_defaults = {
         b'com,example)/missing_content_type 20150415034052 http://example.com/missing_content_type unk 200 3I42H3S6NNFQ2MSVX7XZKYAYSCX5QBYJ - - 267 0 missing_content_type.warc.gz'
     ],
     'negative_content_length.arc.gz': [
-        b'com,lastdaywatchers)/robots.txt 20120420180002 http://www.lastdaywatchers.com/robots.txt text/html 301 3I42H3S6NNFQ2MSVX7XZKYAYSCX5QBYJ - - 244 155 negative_content_length.arc.gz'
+        b'com,lastdaywatchers)/robots.txt 20120420180002 http://www.lastdaywatchers.com/robots.txt text/html 301 3I42H3S6NNFQ2MSVX7XZKYAYSCX5QBYJ S - 244 155 negative_content_length.arc.gz'
     ],
      # from channel4-www.channel4.com--20140218-1632/channel4-www.channel4.com--20140218-1632-20140218163723-00000-72ebc14a-e463-4284-8b77-2bb1cbf89f0f.warc.gz
      # no WARC-Payload-Digest, HTTP Content-Length: 5486 is smaller than actual 23856. 3.x computed SHA1 5YMS42S5QTOOT5OMMYSXM23ZLZJB6KPR from full content. 4.x computes SHA1 for the 5486 bytes.
@@ -343,6 +343,10 @@ warcs_defaults = {
     # chunk-encoded, missing the last "0".
     'missing_chunk_end.warc.gz': [
         b'com,example)/robots.txt 20180803220238 https://example.com/robots.txt text/html 200 W6PEP6F76ZFMLBSNK575R7TWG5STXYBO - - 2406 0 missing_chunk_end.warc.gz'
+    ],
+    # self-redirect http->https
+    'self_redirect.warc.gz': [
+        b'org,example)/ 20191021212334 http://example.org/ text/html 301 VMWIPIGAV7UTGNCEHMV6PCGNVW5OL6SG S - 467 273 self_redirect.warc.gz'
     ]
 }
 

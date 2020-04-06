@@ -9,6 +9,8 @@ from datetime import datetime
 from httplib import IncompleteRead
 import six
 
+from six.moves.urllib.parse import urljoin
+
 class RecordStreamReader(io.RawIOBase):
     def __init__(self, stream):
         """This class serves two purposes:
@@ -626,10 +628,20 @@ class HttpHandler(RecordHandler):
     """Logic common to all HTTP response records
     (``response`` and ``revisit`` record types).
     """
+    _content_factory = HttpResponseRecordContent
     meta_tags = None
 
     @property
     def redirect(self):
+        # write "S" for self-redirects (i.e. it's a redirect ot the  same
+        # key.
+        location = self.content.get_http_header('location')
+        if location:
+            location = urljoin(self.record.url, location)
+            key = self.urlkey(location)
+            if key == self.massaged_url:
+                return 'S'
+
         # Aaron, Ilya, and Kenji have proposed using '-' in the redirect column
         # unconditionally, after a discussion on Sept 5, 2012. It turns out the
         # redirect column of the cdx has no effect on the Wayback Machine, and
@@ -668,7 +680,6 @@ class HttpHandler(RecordHandler):
 class ResponseHandler(HttpHandler):
     """Handler for HTTP response with archived content (``response`` record type).
     """
-    _content_factory = HttpResponseRecordContent
 
     def __init__(self, record, env):
         super(ResponseHandler, self).__init__(record, env)
