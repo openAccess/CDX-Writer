@@ -59,20 +59,106 @@ class DigestingReader(io.RawIOBase):
         return n
 
 from six.moves.http_client import (
-    HTTPResponse, BadStatusLine, UnknownProtocol, HTTPMessage,
+    HTTPResponse, BadStatusLine, UnknownProtocol,
     CONTINUE,NO_CONTENT, NOT_MODIFIED
 )
+from six.moves.http_client import HTTPMessage as HTTPMessageBase
+
 if issubclass(HTTPResponse, object):
     HTTPResponseParserBase = HTTPResponse
 else:
     # Python 2 HTTPResponse is an old class. We need a new-style base class
     HTTPResponseParserBase = type('HTTPResponseParserBase', (object, HTTPResponse), {})
 
-# raise header count limit (default 100)
-six.moves.http_client._MAXHEADERS = 32767
-# raise header line length limit (default 65536)
-# (-1 because HTTPResponse adds 1 to it)
-six.moves.http_client._MAXLINE = (2 * 1024 * 1024 - 1)
+# headers not saved in HTTPResponseParser - those not useful for indexing
+# archive records. set-cookie is the most common offender.
+HEADERS_IGNORED = set([
+    'set-cookie',
+    'x-powered-by',
+    'cache-control',
+    'x-ua-compatible',
+    'connection',
+    'x-content-type=options',
+    'p3p',
+    'x-xss-protection',
+    'x-frame-options',
+    'x-download-options',
+    'expires',
+    'pragma'
+])
+
+class HTTPMessage(HTTPMessageBase):
+    # Overridden to disable check on the number of header fields. There are
+    # too many cases of more than 30K header fields in real world. In order
+    # to reduce memory consumption, we discard those headers not interesting
+    # to archive record indexing.
+    def readheaders(self):
+        self.dict = {}
+        self.unixfrom = ''
+        self.headers = hlist = []
+        self.status = ''
+        headerseen = ""
+        firstline = 1
+        startofline = unread = tell = None
+        if hasattr(self.fp, 'unread'):
+            unread = self.fp.unread
+        elif self.seekable:
+            tell = self.fp.tell
+        while True:
+            if tell:
+                try:
+                    startofline = tell()
+                except IOError:
+                    startofline = tell = None
+                    self.seekable = 0
+            line = self.fp.readline()
+            if not line:
+                self.status = 'EOF in headers'
+                break
+            # Skip unix From name time lines
+            if firstline and line.startswith('From '):
+                self.unixfrom = self.unixfrom + line
+                continue
+            firstline = 0
+            if headerseen and line[0] in ' \t':
+                # XXX Not sure if continuation lines are handled properly
+                # for http and/or for repeating headers
+                # It's a continuation line.
+                hlist.append(line)
+                self.addcontinue(headerseen, line.strip())
+                continue
+            elif self.iscomment(line):
+                # It's a comment.  Ignore it.
+                continue
+            elif self.islast(line):
+                # Note! No pushback here!  The delimiter line gets eaten.
+                break
+            headerseen = self.isheader(line)
+            if headerseen:
+                # It's a legal header line, save it.
+                if headerseen.lower() not in HEADERS_IGNORED:
+                    hlist.append(line)
+                    self.addheader(headerseen, line[len(headerseen)+1:].strip())
+                continue
+            elif headerseen is not None:
+                # An empty header name. These aren't allowed in HTTP, but it's
+                # probably a benign mistake. Don't add the header, just keep
+                # going.
+                continue
+            else:
+                # It's not a header line; throw it back and stop here.
+                if not self.dict:
+                    self.status = 'No headers'
+                else:
+                    self.status = 'Non-header line where header expected'
+                # Try to undo the read.
+                if unread:
+                    unread(line)
+                elif tell:
+                    self.fp.seek(startofline)
+                else:
+                    self.status = self.status + '; bad seek'
+                break
 
 class HTTPResponseParser(HTTPResponseParserBase):
     def __init__(self, fileobj):
