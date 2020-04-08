@@ -347,6 +347,11 @@ warcs_defaults = {
     # self-redirect http->https
     'self_redirect.warc.gz': [
         b'org,example)/ 20191021212334 http://example.org/ text/html 301 VMWIPIGAV7UTGNCEHMV6PCGNVW5OL6SG S - 467 273 self_redirect.warc.gz'
+    ],
+    # contains headers ignored by cdx_writer.handler.HTTPMessage, including
+    # header continuation
+    'ignored_headers.warc.gz': [
+        b'jp,co,jrhokkaido)/press/2013/130920-1.pdf 20200406225837 https://www.jrhokkaido.co.jp/press/2013/130920-1.pdf text/html 200 FGVG2SEVUDFJ374WYEOM6MR3HEV5QXA6 - - 755 281 ignored_headers.warc.gz'
     ]
 }
 

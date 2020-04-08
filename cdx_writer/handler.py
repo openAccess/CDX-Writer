@@ -126,8 +126,9 @@ class HTTPMessage(HTTPMessageBase):
                 # XXX Not sure if continuation lines are handled properly
                 # for http and/or for repeating headers
                 # It's a continuation line.
-                hlist.append(line)
-                self.addcontinue(headerseen, line.strip())
+                if headerseen.lower() not in HEADERS_IGNORED:
+                    hlist.append(line)
+                    self.addcontinue(headerseen, line.strip())
                 continue
             elif self.iscomment(line):
                 # It's a comment.  Ignore it.
