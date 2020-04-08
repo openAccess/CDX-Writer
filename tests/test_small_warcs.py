@@ -352,6 +352,10 @@ warcs_defaults = {
     # header continuation
     'ignored_headers.warc.gz': [
         b'jp,co,jrhokkaido)/press/2013/130920-1.pdf 20200406225837 https://www.jrhokkaido.co.jp/press/2013/130920-1.pdf text/html 200 FGVG2SEVUDFJ374WYEOM6MR3HEV5QXA6 - - 755 281 ignored_headers.warc.gz'
+    ],
+    # bad URL in location header
+    'invalid_location.warc.gz': [
+        b'com,example)/favicon.ico 20200406211632 https://example.com/favicon.ico unk 302 3I42H3S6NNFQ2MSVX7XZKYAYSCX5QBYJ - - 369 482 invalid_location.warc.gz'
     ]
 }
 
