@@ -340,6 +340,10 @@ warcs_defaults = {
     'bracket_in_target_uri.warc.gz': [
         b'com,example)/data.json 20180625013519 https://www.example.com/data.json application/json 200 L43LF2RJAZC64NGZIMRAUFFVJ3S6UW7F - - 328 0 bracket_in_target_uri.warc.gz'
     ],
+    # "]" in target URI - redirect capture version
+    'bracket_in_target_uri_redirect.arc.gz': [
+        b'com,example)/go/url=http:/http[img 20191007055500 http://example.com:80/go/url=http://http[IMG text/html 303 CYKN7HZ4WG26DXAEBMWX3WKC6NKZSRIJ - - 200 147 bracket_in_target_uri_redirect.arc.gz'
+    ],
     # chunk-encoded, missing the last "0".
     'missing_chunk_end.warc.gz': [
         b'com,example)/robots.txt 20180803220238 https://example.com/robots.txt text/html 200 W6PEP6F76ZFMLBSNK575R7TWG5STXYBO - - 2406 0 missing_chunk_end.warc.gz'

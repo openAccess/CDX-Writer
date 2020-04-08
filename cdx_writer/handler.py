@@ -638,8 +638,8 @@ class HttpHandler(RecordHandler):
         # key.
         location = self.content.get_http_header('location')
         if location:
-            location = urljoin(self.record.url, location)
             try:
+                location = urljoin(self.record.url, location)
                 key = self.urlkey(location)
             except Exception:
                 # ignore invalid URL
