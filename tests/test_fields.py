@@ -107,10 +107,12 @@ def test_date_warc(tmpdir, date, expected):
 @pytest.mark.parametrize("contenttype,expected", [
     (b'text/plain', b'text/plain'),
     # bad_mime_type
-    (b'imag\xD1m)', b'unk'),
+    (b'imag\xEF\xBF\xBDm)', b'unk'),
     # alexa_charset_in_header
     # INA-HISTORICAL-1996-GROUP-AAA-20100812000000-00000-c/INA-HISTORICAL-2000-GROUP-ACS-20100812000000-00001.arc.gz, fixed in warctools changeset 92:ca95fa09848b
-    (b'text/html; Charset=iso-8859-1', 'text/html')
+    (b'text/html; Charset=iso-8859-1', 'text/html'),
+    # aug-000823102923-c/aug-000823104637.arc.gz
+    (b'text/html; charset=koi8-r; charset=windows-1251', 'text/html')
 ])
 def test_contenttype_arc(tmpdir, contenttype, expected):
     arc = tmpdir / 'a.arc.gz'

@@ -55,6 +55,7 @@ warcs_all_records = {
         b'filedesc://crc24.20001110112006.arc 20001110112000 filedesc://crc24.20001110112006.arc warc/filedesc - VXEDWGPHSNERWHDOUD6YWRWNT4ZOLEX4 - - 179 0 arc_v1_with_v2_header.arc.gz',
         b'com,cdnow)/cgi-bin/mserver/pagename=/rp/cdn/find/discography.html/artistid=henderson*joe/select=music 20001110112000 http://www.cdnow.com:80/cgi-bin/mserver/pagename=/RP/CDN/FIND/discography.html/artistid=HENDERSON*JOE/select=music text/html 200 Z7XLU7KXZVH3AAC6ZZLMMRVWPHC44ALO - - 8884 179 arc_v1_with_v2_header.arc.gz'
     ],
+    # moved to test_fields.py
     # 'bad_mime_type.arc.gz': [
     #     b'filedesc://live-20120407151931218-00299.arc 20120407151931 filedesc://live-20120407151931218-00299.arc warc/filedesc - VXEDWGPHSNERWHDOUD6YWRWNT4ZOLEX4 - - 153 0 bad_mime_type.arc.gz',
     #     b'net,naver,cafethumb)/20101223_84/qkrgns3_129303386816936xuq_jpg/imag0030_qkrgns3.jpg 20120407152447 http://cafethumb.naver.net/20101223_84/qkrgns3_129303386816936xUq_jpg/imag0030_qkrgns3.jpg unk 200 OUK52MTLKPEA6STHTFFPFI2JP7G4QBUZ - - 3587 153 bad_mime_type.arc.gz'
@@ -230,6 +231,7 @@ warcs_defaults = {
     'arc_v1_with_v2_header.arc.gz': [
         b'com,cdnow)/cgi-bin/mserver/pagename=/rp/cdn/find/discography.html/artistid=henderson*joe/select=music 20001110112000 http://www.cdnow.com:80/cgi-bin/mserver/pagename=/RP/CDN/FIND/discography.html/artistid=HENDERSON*JOE/select=music text/html 200 Z7XLU7KXZVH3AAC6ZZLMMRVWPHC44ALO - - 8884 179 arc_v1_with_v2_header.arc.gz',
     ],
+    # moved to test_fields.py
     # 'bad_mime_type.arc.gz': [
     #     b'net,naver,cafethumb)/20101223_84/qkrgns3_129303386816936xuq_jpg/imag0030_qkrgns3.jpg 20120407152447 http://cafethumb.naver.net/20101223_84/qkrgns3_129303386816936xUq_jpg/imag0030_qkrgns3.jpg unk 200 OUK52MTLKPEA6STHTFFPFI2JP7G4QBUZ - - 3587 153 bad_mime_type.arc.gz'
     # ],

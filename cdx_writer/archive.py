@@ -36,7 +36,7 @@ ARC_HEADER_FIELDS = {
     ArcRecord.IP: br"((?:\d{1,3}\.){3}\d{1,3}|-_a-zA-Z0-9.]+)",
     # some timestamps have more or less digits than 14
     ArcRecord.DATE: br"(\d{12,16})",
-    ArcRecord.CONTENT_TYPE: br"(\S+)(?:;\s*\S+)?",
+    ArcRecord.CONTENT_TYPE: br"(\S+)(?:;\s*\S+)*",
     ArcRecord.CONTENT_LENGTH: br"(\d+)",
     ArcRecord.RESULT_CODE: br"(\d{3})",
     ArcRecord.CHECKSUM: br"(\S+)",
@@ -97,7 +97,7 @@ class PatchedArcParser(ArcParser):
                 return list(zip(headers, values))
 
         raise Exception('ARC header %s does not match declared %s',
-                        line, ",".join(self.headers))
+                        line, " ".join(self.headers))
         # if len(values) > len(headers):
         #     # line has more fields than declared - following is copy of warctools 4.10 code.
         #     if self.headers[0] in (ArcRecord.URL, ArcRecord.CONTENT_TYPE):
