@@ -10,8 +10,9 @@ changes very difficult to merge. Here we reimplement them as runtime patches.
 As this module monkey-patches hanzo.warctools modules upon import, all access to
 hanzo.warctools shall be made after importing this module.
 """
-from __future__ import unicode_literals
+from __future__ import unicode_literals, print_function
 
+import sys
 import re
 import hanzo
 from hanzo.warctools import ArchiveRecord
@@ -187,6 +188,53 @@ class PatchedGzipRecordStream(GzipRecordStream):
                               record_parser)
         self.raw_fh = file_handle
 
+    def _find_gzip_header(self):
+        # this could be a little bit more efficient.
+        f = self.raw_fh
+        b = bytearray(f.read(4))
+        while len(b) == 4:
+            if b[0] == 0x1f and b[1] == 0x8b:
+                # compression method is deflate (8). Python gzip does not
+                # recognize anything other than 8.
+                if b[2] == 8:
+                    # and not encrypted
+                    if (b[3] & 0x20) == 0:
+                        f.seek(-4, 1)
+                        return True
+                b = b[2:]
+                b.extend(f.read(2))
+            else:
+                b = b[1:]
+                b.extend(f.read(1))
+        return False
+
+    def reset(self):
+        """reset gzip reader to read compressed block afresh from the current
+        position.
+        """
+        # check if there's gzip header at current location. if not, read off
+        # until found.
+        start_offset = self.raw_fh.tell()
+        magic = self.raw_fh.read(2)
+        if magic == b'':
+            pass
+        if magic == b'\x1f\x8b':
+            self.raw_fh.seek(-len(magic), 1)
+        else:
+            if len(magic) > 1:
+                # back up 1 byte
+                self.raw_fh.seek(-1, 1)
+            if self._find_gzip_header():
+                found_offset = self.raw_fh.tell()
+                if found_offset > start_offset:
+                    print('!!! skipped unusable data %d-%d' % (
+                        start_offset, found_offset - 1), file=sys.stderr)
+            else:
+                if self.raw_fh.tell() > start_offset:
+                    print('!!! skipped unusable data %d-EOF' % (start_offset,),
+                          file=sys.stderr)
+        self.fh = PatchedGeeZipFile(fileobj=self.raw_fh)
+
     def _finish_record(self):
         self.fh.finish_member()
 
@@ -205,16 +253,30 @@ class PatchedGzipRecordStream(GzipRecordStream):
 
     def read_records(self, limit=1, offsets=True):
         # overridden to support empty gzip member
-        nrecords = 0
-        prev_offset = None
-        while limit is None or nrecords < limit:
-            offset, record, errors = self._read_record(offsets)
-            nrecords += 1
-            yield offset, record, errors
-            if not record and prev_offset is not None and prev_offset == offset:
-                break
-            prev_offset = offset
+        self._remaining = -1 if limit is None else limit
+        self._offsets = offsets
+        self._prev_offset = None
+        return self
 
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        #nrecords = 0
+        #prev_offset = None
+        if self._remaining == 0:
+            raise StopIteration()
+        offset, record, errors = self._read_record(self._offsets)
+        if not record:
+            # for an empty gzip block record is None but offset advances.
+            if self._prev_offset is not None and self._prev_offset == offset:
+                raise StopIteration()
+        if self._remaining > 0:
+            self._remaining -= 1
+        self._prev_offset = offset
+        return offset, record, errors
+
+    next = __next__
 
 hanzo.warctools.stream.GzipRecordStream = PatchedGzipRecordStream
 
@@ -338,6 +400,10 @@ class ArchiveRecordReader(object):
 
     def __iter__(self):
         return self
+
+    def reset(self):
+        # XXX - works only with gzip W/ARCs
+        self._stream.reset()
 
     def _stream_offset(self):
         if hasattr(self._stream, 'raw_fh'):

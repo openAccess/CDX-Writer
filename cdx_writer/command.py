@@ -4,6 +4,7 @@ import os
 import json
 from operator import attrgetter
 from optparse import OptionParser
+import traceback
 
 from hanzo.warctools import ArchiveRecord
 from surt import surt
@@ -24,7 +25,8 @@ class CDX_Writer(object):
 
     def __init__(self, in_file, out_file=sys.stdout, format="N b a m s k r M S V g",
                  warc_path=None, dispatch_mode=None,
-                 exclude_list=None, canonicalizer=None):
+                 exclude_list=None, canonicalizer=None,
+                 error_handler=None):
         """This class is instantiated for each web archive file and generates
         CDX from it.
 
@@ -72,6 +74,8 @@ class CDX_Writer(object):
 
         self.exclusion = exclude_list or False
 
+        self.error_handler = error_handler or IgnoreCommonErrorHandler()
+
     def _build_fieldgetter(self, fieldcodes):
         """Return a callable that collects CDX field values from a
         :class:`RecordHandler` object, according to CDX field specification
@@ -101,18 +105,26 @@ class CDX_Writer(object):
             'num_records_filtered': 0,
             'num_records_failed': 0
         }
-        if hasattr(self.out_file, "write"):
-            self._make_cdx(self.out_file, self.stats)
-        else:
-            with open(self.out_file, "wb") as w:
-                self._make_cdx(w, self.stats)
+        try:
+            if hasattr(self.out_file, "write"):
+                self._make_cdx(self.out_file, self.stats)
+            else:
+                with open(self.out_file, "wb") as w:
+                    self._make_cdx(w, self.stats)
+        except Exception as ex:
+            if not self.error_handler.should_continue(ex):
+                raise
 
     def _make_cdx(self, out_file, stats):
         out_file.write(b' CDX ' + self.format + b'\n') #print header
 
         record_reader = ArchiveRecordReader(self.in_file)
-        for record in record_reader:
+        while True:
+            offset = record_reader._stream_offset()
             try:
+                record = next(record_reader, None)
+                if record is None:
+                    break
                 stats['num_records_processed'] += 1
                 handler = self.dispatcher.dispatch(record, self)
                 if not handler:
@@ -140,12 +152,84 @@ class CDX_Writer(object):
                 #record.dump()
                 stats['num_records_included'] += 1
             except Exception as ex:
-                print('Error while processing a record at %d' % record.offset,
-                      file=sys.stderr)
                 stats['num_records_failed'] += 1
-                raise
+                if not self.error_handler.should_continue(ex, offset):
+                    print('!!! error while processing a record at %d' % offset,
+                          file=sys.stderr)
+                    raise
 
         record_reader.close()
+
+
+class ErrorHandler(object):
+    def __init__(self):
+        self.errors_seen = set()
+
+    def report_ignored_error(self, error, offset=None):
+        # do not print stack trace for the second and later occurrence of
+        # error from the same source location.
+        etype, value, tb = sys.exc_info()
+        bottom_tb = traceback.extract_tb(tb, 1)
+        # use (file path, line number) as key
+        key = tuple(bottom_tb[:2])
+        seen_before = (key in self.errors_seen)
+        self.errors_seen.add(key)
+
+        if offset is None:
+            print('!!! ignoring an error [[', file=sys.stderr)
+        else:
+            print('!!! ignoring an error while processing a record at %d [['
+                  % offset, file=sys.stderr)
+        if seen_before:
+            print(traceback.format_exception_only(etype, value)[-1],
+                  end='', file=sys.stderr)
+        else:
+            traceback.print_exc(limit=3)
+        print('!!! ]]', file=sys.stderr)
+
+    def should_continue(self, error, offset=None):
+        if self.should_ignore(error):
+            self.report_ignored_error(error, offset)
+            return True
+        return False
+
+class BlanketErrorHandler(ErrorHandler):
+    def __init__(self, ignore):
+        super(BlanketErrorHandler, self).__init__()
+        self.ignore = ignore
+
+    def should_ignore(self, error):
+        return self.ignore
+
+class IgnoreCommonErrorHandler(ErrorHandler):
+    def should_ignore(self, error):
+        msg = str(error)
+        fqtype = '{0.__module__}.{0.__name__}'.format(type(error))
+        if msg == 'Failed to guess compression':
+            # w/arc does snot look like gzip at all
+            return True
+        if fqtype in ('httplib.LineTooLong', 'http.client.LineTooLong'):
+            # can happen for otherwise normal HTTP response, but typically
+            # non-HTTP response in "response" record.
+            return True
+        if msg.startswith('CRC check failed'):
+            # XXX this is not okay (yet) for mid-file record.
+            return True
+        if fqtype == 'zlib.error':
+            return True
+        if msg.startswith('Malformed ARC header:'):
+            # ARc header is broken beyond we can (willing to) rescue
+            return True
+        return False
+
+def error_handler_type(v):
+    if v == 'none':
+        return BlanketErrorHandler(False)
+    if v == 'all':
+        return BlanketErrorHandler(True)
+    if v == 'common':
+        return IgnoreCommonErrorHandler()
+    raise ValueError('ignore_error must be one of {none,common,all}')
 
 def main(args=None):
 
@@ -173,6 +257,8 @@ def main(args=None):
     parser.add_option("--no-host-massage", dest="canonicalizer_options",
                       action='append_const', const=('host_massage', False),
                       help='Turn off host_massage (ex. stripping "www.")')
+    parser.add_option("--ignore-error", choices=['none', 'common', 'all'],
+                      default='common')
 
     if args is None:
         args = sys.argv[1:]
@@ -198,12 +284,15 @@ def main(args=None):
     exclude_list = options.exclude_list and PrefixExclusion(
             options.exclude_list, canonicalizer)
 
+    error_handler = error_handler_type(options.ignore_error)
+
     cdx_writer = CDX_Writer(input_files[0], input_files[1],
                             format=options.format,
                             warc_path=warc_path,
                             dispatch_mode=options.dispatch_mode,
                             exclude_list=exclude_list,
-                            canonicalizer=canonicalizer
+                            canonicalizer=canonicalizer,
+                            error_handler=error_handler
                            )
     try:
         cdx_writer.make_cdx()
