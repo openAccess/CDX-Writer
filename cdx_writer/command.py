@@ -153,7 +153,9 @@ class CDX_Writer(object):
                 stats['num_records_included'] += 1
             except Exception as ex:
                 stats['num_records_failed'] += 1
-                if not self.error_handler.should_continue(ex, offset):
+                if self.error_handler.should_continue(ex, offset):
+                    record_reader.reset()
+                else:
                     print('!!! error while processing a record at %d' % offset,
                           file=sys.stderr)
                     raise
