@@ -8,6 +8,7 @@ import io
 from gzip import GzipFile
 
 from cdx_writer.command import CDX_Writer
+from cdx_writer.archive import ArchiveRecordReader
 
 import pytest
 import py
@@ -130,3 +131,27 @@ def test_contenttype_arc(tmpdir, contenttype, expected):
 
     mimetype = get_cdx_fields(arc)[3]
     assert mimetype == expected
+
+@pytest.mark.parametrize("ipaddr,expected", [
+    (b'1.2.3.4', b'1.2.3.4'),
+    # empty value; green-000008-20000228185217-951859964-c/green-000008-20000407021139-955146423.arc.gz
+    (b'', None)
+])
+def test_ipaddr_arc(tmpdir, ipaddr, expected):
+    arc = tmpdir / 'a.arc.gz'
+
+    with arc.open('wb') as w:
+        write_arc_record(w, [
+            b'filedesc://a.arc.gz', b'0.0.0.0', b'20160209153640', b'text/plain'
+        ], (
+            b"1 1 InternetArchive\n"
+            b"URL IP-address Archive-date Content-type Archive-length\n"
+        ))
+        write_arc_record(w, [
+            b'http://example.com/', ipaddr, b'20100926112346', b'text/html'
+        ], http_response())
+
+    record_reader = ArchiveRecordReader(str(arc))
+    records = list(iter(record_reader))
+    ipaddr_read = records[1].ip_address
+    assert ipaddr_read == expected

@@ -34,7 +34,7 @@ ARC_HEADER_V1 = [ArcRecord.URL, ArcRecord.IP, ArcRecord.DATE, ArcRecord.CONTENT_
 ARC_HEADER_FIELDS = {
     ArcRecord.URL: br"([a-z]+:.*)",
     # some IP-Address field has hostname
-    ArcRecord.IP: br"((?:\d{1,3}\.){3}\d{1,3}|-_a-zA-Z0-9.]+)",
+    ArcRecord.IP: br"((?:\d{1,3}\.){3}\d{1,3}|)",
     # some timestamps have more or less digits than 14
     ArcRecord.DATE: br"(\d{12,16})",
     ArcRecord.CONTENT_TYPE: br"(\S+)(?:;\s*\S+)*",
