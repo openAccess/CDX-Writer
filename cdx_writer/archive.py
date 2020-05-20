@@ -222,7 +222,7 @@ class PatchedGzipRecordStream(GzipRecordStream):
             self.raw_fh.seek(start_offset + 1, 0)
         else:
             # just in case - avoid infinite loop
-            start_offset = self.raw_fh.tell()
+            saved_offset = self.raw_fh.tell()
             # if GzipFile.decompress has unused_data, we're resuming from
             # CRC/length check failure. We shall not call finish_member, or
             # GzipFile gets confused and moves file pointer to a wrong place.
@@ -233,7 +233,10 @@ class PatchedGzipRecordStream(GzipRecordStream):
                     self.fh.finish_member()
                 except Exception as ex:
                     pass
-            start_offset = max(self.raw_fh.tell(), start_offset)
+                start_offset = self.raw_fh.tell()
+                if start_offset < saved_offset:
+                    self.raw_fh.seek(saved_offset, 0)
+                    start_offset = self.raw_fh.tell()
         magic = self.raw_fh.read(2)
         if magic == b'':
             pass
