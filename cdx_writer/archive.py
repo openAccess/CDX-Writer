@@ -17,7 +17,6 @@ import re
 import hanzo
 from hanzo.warctools import ArchiveRecord
 from hanzo.warctools.stream import open_record_stream as _open_record_stream
-from .handler import ParseError
 
 from hanzo.warctools.arc import SPLIT, ArcParser, ArcRecord
 from hanzo.warctools.warc import WarcRecord
@@ -30,6 +29,9 @@ except ImportError:
 
 ARC_HEADER_V1 = [ArcRecord.URL, ArcRecord.IP, ArcRecord.DATE, ArcRecord.CONTENT_TYPE,
                  ArcRecord.CONTENT_LENGTH]
+
+class RecordParseError(Exception):
+    pass
 
 ARC_HEADER_FIELDS = {
     ArcRecord.URL: br"([a-z]+:.*)",
@@ -208,13 +210,30 @@ class PatchedGzipRecordStream(GzipRecordStream):
                 b.extend(f.read(1))
         return False
 
-    def reset(self):
+    def reset(self, start_offset=None):
         """reset gzip reader to read compressed block afresh from the current
         position.
         """
         # check if there's gzip header at current location. if not, read off
         # until found.
-        start_offset = self.raw_fh.tell()
+        if start_offset is not None:
+            # seek back to the start of errored record + 1, to skip the
+            # GZIP header of the record.
+            self.raw_fh.seek(start_offset + 1, 0)
+        else:
+            # just in case - avoid infinite loop
+            start_offset = self.raw_fh.tell()
+            # if GzipFile.decompress has unused_data, we're resuming from
+            # CRC/length check failure. We shall not call finish_member, or
+            # GzipFile gets confused and moves file pointer to a wrong place.
+            # (currently CRC/length check failure case is not supposed to run
+            # this branch (supposed to run then branch above).
+            if self.fh.decompress.unused_data == b'':
+                try:
+                    self.fh.finish_member()
+                except Exception as ex:
+                    pass
+            start_offset = max(self.raw_fh.tell(), start_offset)
         magic = self.raw_fh.read(2)
         if magic == b'':
             pass
@@ -227,11 +246,11 @@ class PatchedGzipRecordStream(GzipRecordStream):
             if self._find_gzip_header():
                 found_offset = self.raw_fh.tell()
                 if found_offset > start_offset:
-                    print('!!! skipped unusable data %d-%d' % (
-                        start_offset, found_offset - 1), file=sys.stderr)
+                    print('!!! skipped unusable data up to offset %d' % (
+                        found_offset - 1), file=sys.stderr)
             else:
                 if self.raw_fh.tell() > start_offset:
-                    print('!!! skipped unusable data %d-EOF' % (start_offset,),
+                    print('!!! skipped unusable data up to EOF',
                           file=sys.stderr)
         self.fh = PatchedGeeZipFile(fileobj=self.raw_fh)
 
@@ -401,9 +420,9 @@ class ArchiveRecordReader(object):
     def __iter__(self):
         return self
 
-    def reset(self):
+    def reset(self, start_offset=None):
         # XXX - works only with gzip W/ARCs
-        self._stream.reset()
+        self._stream.reset(start_offset)
 
     def _stream_offset(self):
         if hasattr(self._stream, 'raw_fh'):
@@ -436,11 +455,14 @@ class ArchiveRecordReader(object):
             if self._next_record:
                 offset, record, errors = self._next_record
                 self._next_record = None
+                # errors can be non-empty even when record is not
+                # None, but they are non-critical errors. we ignore
+                # them. record.errors can also carry non-critical errors.
                 if record is None:
-                    if errors:
-                        raise ParseError(str(errors))
                     # RecordStream can return None for both record and error
                     # at the end of WARC file. safely ignored.
+                    if errors:
+                        raise RecordParseError(errors[0])
                     continue
                 return ArchiveRecordEx(self, offset, record)
             # end marker

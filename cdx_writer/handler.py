@@ -11,6 +11,9 @@ import six
 
 from six.moves.urllib.parse import urljoin
 
+class FieldValueError(Exception):
+    pass
+
 class RecordStreamReader(io.RawIOBase):
     def __init__(self, stream):
         """This class serves two purposes:
@@ -416,9 +419,6 @@ def urljoin_and_normalize(base, url, charset):
     return norm_url.replace(' ', '%20')
 
 
-class ParseError(Exception):
-    pass
-
 class NoCloseBufferedReader(io.BufferedReader):
     """BufferedReader that does not propagate close to underlining stream.
     """
@@ -492,7 +492,10 @@ class RecordHandler(object):
             return record.date[:14]
 
         #warc record
-        date = datetime.strptime(record.date[:19], "%Y-%m-%dT%H:%M:%S")
+        try:
+            date = datetime.strptime(record.date[:19], "%Y-%m-%dT%H:%M:%S")
+        except ValueError as ex:
+            raise FieldValueError('Archive-Date: {}'.format(record.date))
         return date.strftime("%Y%m%d%H%M%S")
 
     def safe_url(self):

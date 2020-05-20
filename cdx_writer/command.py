@@ -5,6 +5,7 @@ import json
 from operator import attrgetter
 from optparse import OptionParser
 import traceback
+import zlib
 
 from hanzo.warctools import ArchiveRecord
 from surt import surt
@@ -135,8 +136,13 @@ class CDX_Writer(object):
                 ### check the content_length from the arc header, not the computed payload size returned by record.content_length
                 # XXX move this to dispatcher.
                 content_length_str = record.get_header(record.CONTENT_LENGTH)
-                if content_length_str is not None and int(content_length_str) < 0:
-                    continue
+                if content_length_str:
+                    try:
+                        clen = int(content_length_str)
+                        if clen < 0:
+                            continue
+                    except ValueError:
+                        pass
 
                 surt = handler.massaged_url
                 if self.should_exclude(surt):
@@ -154,7 +160,14 @@ class CDX_Writer(object):
             except Exception as ex:
                 stats['num_records_failed'] += 1
                 if self.error_handler.should_continue(ex, offset):
-                    record_reader.reset()
+                    if is_decompression_error(ex):
+                        # in case of a decompression error, decompressor may
+                        # have read far beyond the next helthy record. go back
+                        # to the beginning of the record and search for the
+                        # next possible record.
+                        record_reader.reset(offset)
+                    else:
+                        record_reader.reset()
                 else:
                     print('!!! error while processing a record at %d' % offset,
                           file=sys.stderr)
@@ -162,6 +175,18 @@ class CDX_Writer(object):
 
         record_reader.close()
 
+def is_decompression_error(error):
+    if isinstance(error, zlib.error):
+        # error at zlib level
+        return True
+    if isinstance(error, IOError):
+        # error at gzip level; CRC/length check failure
+        msg = str(error)
+        if msg == "Incorrect length of data produced":
+            return True
+        if msg.startswith("CRC check failed "):
+            return True
+    return False
 
 class ErrorHandler(object):
     def __init__(self):
@@ -214,13 +239,14 @@ class IgnoreCommonErrorHandler(ErrorHandler):
             # can happen for otherwise normal HTTP response, but typically
             # non-HTTP response in "response" record.
             return True
-        if msg.startswith('CRC check failed'):
-            # XXX this is not okay (yet) for mid-file record.
-            return True
-        if fqtype == 'zlib.error':
+        if is_decompression_error(error):
             return True
         if msg.startswith('Malformed ARC header:'):
             # ARc header is broken beyond we can (willing to) rescue
+            return True
+        if fqtype == ('cdx_writer.archive.RecordParseError'):
+            return True
+        if fqtype == ('cdx_writer.handler.FieldValueError'):
             return True
         return False
 
