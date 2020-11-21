@@ -546,12 +546,11 @@ class RecordHandler(object):
         if content_type == 'no-type':
             return 'unk'
 
-        m = re.match(r'(.+?);', content_type)
-        if m:
-            content_type = m.group(1)
+        mtype, d, params = content_type.partition(';')
+        mtype = mtype.strip().lower()
 
-        if re.match(r'[-a-z0-9.+/]+$', content_type):
-            return content_type
+        if re.match(r'[-a-z0-9.+/]+$', mtype):
+            return mtype
         else:
             return 'unk'
 

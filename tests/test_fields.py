@@ -132,6 +132,31 @@ def test_contenttype_arc(tmpdir, contenttype, expected):
     mimetype = get_cdx_fields(arc)[3]
     assert mimetype == expected
 
+@pytest.mark.parametrize("contenttype,expected", [
+    (b'text/html', b'text/html'),
+    (b'text/html;', b'text/html'),
+    (b'text/html; charset=UTF-8', b'text/html'),
+    (b'text/html ; charset=UTF-8', b'text/html'),
+    (b'text/html;charset=UTF-8', b'text/html'),
+    # uppercase
+    (b'Text/Html', b'text/html'),
+    (b'Text/Html; charset=UTF-8', b'text/html')
+])
+def test_contenttype_warc(tmpdir, contenttype, expected):
+    date = b'2020-09-01T11:22:33'
+    warc = tmpdir / 'a.warc.gz'
+
+    with warc.open('wb') as w:
+        write_warc_record(w, [
+            (b'WARC-Type', b'response'),
+            (b'WARC-Target-URI', b'http://example.com/'),
+            (b'WARC-Date', date),
+            (b'Content-Type', contenttype.encode('utf-8'))
+        ], http_response())
+
+    mimetype = get_cdx_fields(warc)[3]
+    assert mimetype == expected
+
 @pytest.mark.parametrize("ipaddr,expected", [
     (b'1.2.3.4', b'1.2.3.4'),
     # empty value; green-000008-20000228185217-951859964-c/green-000008-20000407021139-955146423.arc.gz
