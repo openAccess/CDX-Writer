@@ -140,7 +140,8 @@ def test_contenttype_arc(tmpdir, contenttype, expected):
     (b'text/html;charset=UTF-8', b'text/html'),
     # uppercase
     (b'Text/Html', b'text/html'),
-    (b'Text/Html; charset=UTF-8', b'text/html')
+    (b'Text/Html; charset=UTF-8', b'text/html'),
+    (b'image/GIF', b'image/gif')
 ])
 def test_contenttype_warc(tmpdir, contenttype, expected):
     date = b'2020-09-01T11:22:33'
