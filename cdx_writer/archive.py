@@ -99,8 +99,8 @@ class PatchedArcParser(ArcParser):
                 values = m.groups()
                 return list(zip(headers, values))
 
-        raise Exception('Malformed ARC header: %r does not match declared "%s"'
-                        % (line, " ".join(self.headers)))
+        raise Exception('Malformed ARC header: %r does not match declared %r'
+                        % (line, b" ".join(self.headers)))
         # if len(values) > len(headers):
         #     # line has more fields than declared - following is copy of warctools 4.10 code.
         #     if self.headers[0] in (ArcRecord.URL, ArcRecord.CONTENT_TYPE):
