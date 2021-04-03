@@ -186,6 +186,8 @@ def is_decompression_error(error):
             return True
         if msg.startswith("CRC check failed "):
             return True
+        if msg == 'Not a gzipped file':
+            return True
     return False
 
 class ErrorHandler(object):

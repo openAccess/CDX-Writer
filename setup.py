@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='CDX-Writer',
-    version='0.4.4.3',
+    version='0.4.4.4',
     packages=find_packages(),
     install_requires=[
         'warctools>=4.10.0',
