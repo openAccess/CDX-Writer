@@ -12,6 +12,7 @@ from surt import surt
 
 from .dispatcher import DefaultDispatcher, AllDispatcher
 from .screenshot import ScreenshotDispatcher
+from .video      import VideoDispatcher
 from .exclusion import PrefixExclusion
 from .handler import RecordHandler
 from .archive import ArchiveRecordReader
@@ -21,7 +22,8 @@ class CDX_Writer(object):
         'default': DefaultDispatcher(),
         'all': AllDispatcher(),
 
-        'screenshot': ScreenshotDispatcher()
+        'screenshot': ScreenshotDispatcher(),
+        'video'     : VideoDispatcher(),
     }
 
     def __init__(self, in_file, out_file=sys.stdout, format="N b a m s k r M S V g",
@@ -282,6 +284,8 @@ def main(args=None):
                       help="By default we only index http responses. Use this flag to index all WARC records in the file")
     parser.add_option("--screenshot-mode", dest="dispatch_mode", action="store_const", const="screenshot",
                       help="Special Wayback Machine mode for handling WARCs containing screenshots")
+    parser.add_option("--video-mode", dest="dispatch_mode", action="store_const", const="video",
+                      help="Special Wayback Machine mode for handling WARCs containing video")
     parser.add_option("--exclude-list", dest="exclude_list", help="File containing url prefixes to exclude")
     parser.add_option("--stats-file", dest="stats_file", help="Output json file containing statistics")
     parser.add_option("--no-host-massage", dest="canonicalizer_options",
