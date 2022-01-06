@@ -130,6 +130,15 @@ class CDX_Writer(object):
                 stats['num_records_processed'] += 1
                 handler = self.dispatcher.dispatch(record, self)
                 if not handler:
+                    # ensure record is read off in this cycle, so that errors,
+                    # if any, are reported against this record. If we don't do
+                    # this here, decompression error will happen during the
+                    # next next(record_reader) and thus be associated with a
+                    # wrong record. We need to do this for all cases that goes
+                    # without writing out a cdx line.
+                    # XXX this is oascure. should have a distinct method for
+                    # doing this.
+                    _ = record.compressed_record_size
                     continue
                 assert isinstance(handler, RecordHandler)
 
@@ -141,6 +150,8 @@ class CDX_Writer(object):
                     try:
                         clen = int(content_length_str)
                         if clen < 0:
+                            # see above
+                            _ = record.compressed_record_size
                             continue
                     except ValueError:
                         pass
@@ -148,6 +159,8 @@ class CDX_Writer(object):
                 surt = handler.massaged_url
                 if self.should_exclude(surt):
                     stats['num_records_filtered'] += 1
+                    # see above
+                    _ = record.compressed_record_size
                     continue
 
                 ### precalculated data that is used multiple times

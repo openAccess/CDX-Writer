@@ -219,6 +219,7 @@ class PatchedGzipRecordStream(GzipRecordStream):
         if start_offset is not None:
             # seek back to the start of errored record + 1, to skip the
             # GZIP header of the record.
+            # note start_offset may be at EOF. this will seek beyond EOF by 1.
             self.raw_fh.seek(start_offset + 1, 0)
         else:
             # just in case - avoid infinite loop
@@ -239,7 +240,13 @@ class PatchedGzipRecordStream(GzipRecordStream):
                     start_offset = self.raw_fh.tell()
         magic = self.raw_fh.read(2)
         if magic == b'':
-            pass
+            # At EOF - this is not supposed to happen in known
+            # situations. If it ever happens (due to a bug),
+            # __next__() will fail again with "Not a gzip file" error
+            # and repeat that indefinitely, Setting zero to
+            # self._remaining forces __next__() to return immediately.
+            self._remaining = 0
+            return
         if magic == b'\x1f\x8b':
             self.raw_fh.seek(-len(magic), 1)
         else:
