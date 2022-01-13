@@ -18,7 +18,6 @@ Options:
                                 to index all WARC records in the file
     --screenshot-mode           Special Wayback Machine mode for handling WARCs
                                 containing screenshots
-    --video-mode                Special Wayback Machine mode for handling WARCs containing video
     --exclude-list=EXCLUDE_LIST File containing url prefixes to exclude
     --stats-file=STATS_FILE     Output json file containing statistics
 
