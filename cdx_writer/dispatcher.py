@@ -94,12 +94,5 @@ class AllDispatcher(DefaultDispatcher):
     def dispatch_warcinfo(self, record, env):
         return WarcinfoHandler
 
-    def dispatch_metadata(self, record, env):
-        content_type = record.content_type
-
-        if content_type and content_type.startswith('application/json;generator-youtube-dl'):
-            return VideoMetaHandler
-        return None
-
     def dispatch_any(self, record, env):
         return RecordHandler
